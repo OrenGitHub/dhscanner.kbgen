@@ -43,14 +43,11 @@ executable codegen
     other-modules:
         Cfg,
         Fqn,
-        Ast,
-        Asts,
         Token,
+        KbGen,
         Bitcode,
-        CodeGen,
-        Location,
-        ActualType,
-        SymbolTable
+        Callable,
+        Location
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:

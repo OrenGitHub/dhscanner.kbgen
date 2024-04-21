@@ -11,7 +11,7 @@ import Prelude
 import Data.Aeson()
 
 -- project imports
-import Asts
+import Callable
 import KbGen ( kbGen )
 
 -- general imports
@@ -35,7 +35,7 @@ getHealthcheckR = returnJson $ Healthy True
 
 postHomeR :: Handler Value
 postHomeR = do
-    callables <- requireCheckJsonBody :: Handler Callable
+    callable <- requireCheckJsonBody :: Handler Callable
     returnJson $ kbGen callable
 
 main :: IO ()
