@@ -35,8 +35,8 @@ getHealthcheckR = returnJson $ Healthy True
 
 postHomeR :: Handler Value
 postHomeR = do
-    callable <- requireCheckJsonBody :: Handler Callable
-    returnJson $ kbGen callable
+    callables <- requireCheckJsonBody :: Handler Callables
+    returnJson $ kbGen callables
 
 main :: IO ()
 main = warp 3000 App
