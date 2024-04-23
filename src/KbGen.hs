@@ -45,7 +45,8 @@ data Arg
      {
          argFqn :: Fqn,
          argSerialIdx :: Word,
-         argLocation :: Location
+         argLocation :: Location,
+         callContext :: Location
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -98,4 +99,24 @@ kbGenScriptCalls script = let
     in combine fqns locations
 
 kbGenScriptArgs :: Callable.ScriptContent -> [ Arg ]
-kbGenScriptArgs script = []
+kbGenScriptArgs script = let
+    nodes = Cfg.actualNodes $ Cfg.nodes (scriptBody script)
+    instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes) 
+    calls = catMaybes (Data.Set.toList (Data.Set.map keepCalls instructions))
+    in kbGenScriptArgsFromCalls calls 
+
+kbGenScriptArgsFromCalls :: [ Bitcode.CallContent ] -> [ Arg ]
+kbGenScriptArgsFromCalls calls = Data.List.foldl' (++) [] (kbGenScriptArgsFromCalls' calls)
+
+kbGenScriptArgsFromCalls' :: [ Bitcode.CallContent ] -> [[ Arg ]]
+kbGenScriptArgsFromCalls' = Data.List.map kbGenScriptArgsFromCall
+
+kbGenScriptArgsFromCall :: Bitcode.CallContent -> [ Arg ]
+kbGenScriptArgsFromCall call = kbGenScriptArgsFromCall' 0 (Bitcode.callLocation call) (Bitcode.args call)
+
+kbGenScriptArgsFromCall' :: Word -> Location -> [ Bitcode.Variable ] -> [ Arg ]
+kbGenScriptArgsFromCall' i location [] = []
+kbGenScriptArgsFromCall' i location (arg:args) = let
+    a = Arg (Bitcode.variableFqn arg) i (Bitcode.locationVariable arg) location
+    in a : (kbGenScriptArgsFromCall' (i+1) location args)
+
