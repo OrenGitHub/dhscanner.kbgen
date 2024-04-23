@@ -11,10 +11,11 @@ where
 -- project imports
 import Fqn
 import Cfg
-import Callable
 import Location
+import Callable
 
 -- project qualified imports
+import qualified Token
 import qualified Bitcode
 
 -- general imports
@@ -28,7 +29,9 @@ data KnowledgeBase
    = KnowledgeBase
      {
           calls :: [ Call ],
-          args :: [ Arg ]
+          args :: [ Arg ],
+          lambdas :: [ KBLambda ],
+          params :: [ Param ]
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -50,8 +53,24 @@ data Arg
      }
      deriving ( Show, Generic, ToJSON )
 
+data KBLambda
+   = KBLambda
+     {
+         lambdaLocation :: Location
+     }
+     deriving ( Show, Generic, ToJSON )
+
+data Param
+   = Param
+     {
+         paramSerialIdx :: Word,
+         paramName :: Token.ParamName,
+         callableContext :: Location
+     }
+     deriving ( Show, Generic, ToJSON )
+
 emptyKnowledgeBase :: KnowledgeBase
-emptyKnowledgeBase = KnowledgeBase [] []
+emptyKnowledgeBase = KnowledgeBase [] [] [] []
 
 -- | API: generate a prolog knowledge base from
 -- a collection of callables
@@ -65,11 +84,13 @@ kbGen' (c:cs) = let
     rest = kbGen' cs
     calls' = (calls kb) ++ (calls rest)
     args' = (args kb) ++ (args rest)
-    in KnowledgeBase { calls = calls', args = args' }
+    lambdas' = (lambdas kb) ++ (lambdas rest)
+    params' = (params kb) ++ (params rest)
+    in KnowledgeBase calls' args' lambdas' params'
 
 kbGen'' :: Callable -> KnowledgeBase
 kbGen'' (Callable.Script script) = kbGenScript script
-kbGen'' (Callable.Lambda lambda) = emptyKnowledgeBase -- kbGenLambda lambda
+kbGen'' (Callable.Lambda lambda) = kbGenLambda lambda
 kbGen'' (Callable.Method method) = emptyKnowledgeBase
 kbGen'' (Callable.Function func) = emptyKnowledgeBase
 
@@ -77,7 +98,33 @@ kbGenScript :: Callable.ScriptContent -> KnowledgeBase
 kbGenScript script = let
     calls = kbGenScriptCalls script
     args' = kbGenScriptArgs script
-    in KnowledgeBase calls args'
+    in KnowledgeBase calls args' [] []
+
+kbGenLambda :: Callable.LambdaContent -> KnowledgeBase
+kbGenLambda lambda = let
+    lambdas' = [ KBLambda (Callable.lambdaLocation lambda) ]
+    params' = extractLambdaParams lambda
+    in KnowledgeBase [] [] lambdas' params'
+
+extractLambdaParams :: Callable.LambdaContent -> [ Param ]
+extractLambdaParams lambda = extractLambdaParams' (Callable.lambdaLocation lambda) (Callable.lambdaBody lambda)
+
+extractLambdaParams' :: Location -> Cfg -> [ Param ]
+extractLambdaParams' location cfg = let
+    nodes = Cfg.actualNodes $ Cfg.nodes cfg
+    instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes)
+    paramDecls = catMaybes (Data.Set.toList (Data.Set.map keepParamDecls instructions))
+    in (toParams location paramDecls) 
+
+toParams :: Location -> [ Bitcode.ParamDeclContent ] -> [ Param ]
+toParams location = Data.List.map (toParam location)
+
+toParam :: Location -> Bitcode.ParamDeclContent -> Param
+toParam l (Bitcode.ParamDeclContent p) = Param (Bitcode.paramVariableSerialIdx p) (Bitcode.paramVariableToken p) l 
+
+keepParamDecls :: Bitcode.InstructionContent -> Maybe Bitcode.ParamDeclContent
+keepParamDecls (Bitcode.ParamDecl paramDecl) = Just paramDecl
+keepParamDecls _ = Nothing
 
 keepCalls :: Bitcode.InstructionContent -> Maybe Bitcode.CallContent
 keepCalls (Bitcode.Call call) = Just call 
@@ -115,7 +162,7 @@ kbGenScriptArgsFromCall :: Bitcode.CallContent -> [ Arg ]
 kbGenScriptArgsFromCall call = kbGenScriptArgsFromCall' 0 (Bitcode.callLocation call) (Bitcode.args call)
 
 kbGenScriptArgsFromCall' :: Word -> Location -> [ Bitcode.Variable ] -> [ Arg ]
-kbGenScriptArgsFromCall' i location [] = []
+kbGenScriptArgsFromCall' _ location [] = []
 kbGenScriptArgsFromCall' i location (arg:args) = let
     a = Arg (Bitcode.variableFqn arg) i (Bitcode.locationVariable arg) location
     in a : (kbGenScriptArgsFromCall' (i+1) location args)
