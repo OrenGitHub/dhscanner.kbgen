@@ -96,15 +96,17 @@ kbGen'' (Callable.Function func) = emptyKnowledgeBase
 
 kbGenScript :: Callable.ScriptContent -> KnowledgeBase
 kbGenScript script = let
-    calls = kbGenScriptCalls script
+    calls' = kbGenScriptCalls script
     args' = kbGenScriptArgs script
-    in KnowledgeBase calls args' [] []
+    in KnowledgeBase calls' args' [] []
 
 kbGenLambda :: Callable.LambdaContent -> KnowledgeBase
 kbGenLambda lambda = let
+    calls' = kbGenCalls (Callable.lambdaBody lambda)
+    args' = kbGenArgs (Callable.lambdaBody lambda)
     lambdas' = [ KBLambda (Callable.lambdaLocation lambda) ]
     params' = extractLambdaParams lambda
-    in KnowledgeBase [] [] lambdas' params'
+    in KnowledgeBase calls' args' lambdas' params'
 
 extractLambdaParams :: Callable.LambdaContent -> [ Param ]
 extractLambdaParams lambda = extractLambdaParams' (Callable.lambdaLocation lambda) (Callable.lambdaBody lambda)
@@ -136,8 +138,11 @@ combine _ [] = []
 combine (fqn:fqns) (loc:locs) = (Call fqn loc) : (combine fqns locs)
 
 kbGenScriptCalls :: Callable.ScriptContent -> [ Call ]
-kbGenScriptCalls script = let
-    nodes = Cfg.actualNodes $ Cfg.nodes (scriptBody script)
+kbGenScriptCalls = kbGenCalls . Callable.scriptBody
+
+kbGenCalls :: Cfg -> [ Call ]
+kbGenCalls cfg = let
+    nodes = Cfg.actualNodes $ Cfg.nodes cfg
     instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes)
     calls = catMaybes (Data.Set.toList (Data.Set.map keepCalls instructions))
     callees = Data.List.map Bitcode.callee calls
@@ -146,8 +151,11 @@ kbGenScriptCalls script = let
     in combine fqns locations
 
 kbGenScriptArgs :: Callable.ScriptContent -> [ Arg ]
-kbGenScriptArgs script = let
-    nodes = Cfg.actualNodes $ Cfg.nodes (scriptBody script)
+kbGenScriptArgs = kbGenArgs . Callable.scriptBody 
+
+kbGenArgs :: Cfg -> [ Arg ]
+kbGenArgs cfg = let
+    nodes = Cfg.actualNodes $ Cfg.nodes cfg
     instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes) 
     calls = catMaybes (Data.Set.toList (Data.Set.map keepCalls instructions))
     in kbGenScriptArgsFromCalls calls 
