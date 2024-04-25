@@ -47,7 +47,8 @@ executable codegen
         KbGen,
         Bitcode,
         Callable,
-        Location
+        Location,
+        PrologFileGen
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:

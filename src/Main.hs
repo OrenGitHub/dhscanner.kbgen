@@ -12,6 +12,7 @@ import Data.Aeson()
 
 -- project imports
 import Callable
+import PrologFileGen
 import KbGen ( kbGen )
 
 -- general imports
@@ -36,7 +37,7 @@ getHealthcheckR = returnJson $ Healthy True
 postHomeR :: Handler Value
 postHomeR = do
     callables <- requireCheckJsonBody :: Handler Callables
-    returnJson $ kbGen callables
+    returnJson $ toPrologFile (kbGen callables)
 
 main :: IO ()
 main = warp 3000 App
