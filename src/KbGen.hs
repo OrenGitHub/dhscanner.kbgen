@@ -10,11 +10,12 @@ where
 
 -- project imports
 import Fqn
-import Cfg
 import Location
 import Callable
+import Cfg ( Cfg )
 
 -- project qualified imports
+import qualified Cfg
 import qualified Token
 import qualified Bitcode
 
@@ -23,7 +24,9 @@ import Data.Set
 import Data.List
 import Data.Maybe
 import Data.Aeson
-import GHC.Generics
+
+-- general imports (with hidden names)
+import GHC.Generics hiding ( from, to )
 
 data KnowledgeBase
    = KnowledgeBase
@@ -31,7 +34,16 @@ data KnowledgeBase
           calls :: [ Call ],
           args :: [ Arg ],
           lambdas :: [ KBLambda ],
-          params :: [ Param ]
+          params :: [ Param ],
+          dataflow :: [ Edge ]
+     }
+     deriving ( Show, Generic, ToJSON )
+
+data Edge
+   = Edge
+     {
+         from :: Bitcode.Variable,
+         to :: Bitcode.Variable
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -70,7 +82,7 @@ data Param
      deriving ( Show, Generic, ToJSON )
 
 emptyKnowledgeBase :: KnowledgeBase
-emptyKnowledgeBase = KnowledgeBase [] [] [] []
+emptyKnowledgeBase = KnowledgeBase [] [] [] [] []
 
 -- | API: generate a prolog knowledge base from
 -- a collection of callables
@@ -86,7 +98,8 @@ kbGen' (c:cs) = let
     args' = (args kb) ++ (args rest)
     lambdas' = (lambdas kb) ++ (lambdas rest)
     params' = (params kb) ++ (params rest)
-    in KnowledgeBase calls' args' lambdas' params'
+    dataflow' = (dataflow kb) ++ (dataflow rest)
+    in KnowledgeBase calls' args' lambdas' params' dataflow' 
 
 kbGen'' :: Callable -> KnowledgeBase
 kbGen'' (Callable.Script script) = kbGenScript script
@@ -98,7 +111,7 @@ kbGenScript :: Callable.ScriptContent -> KnowledgeBase
 kbGenScript script = let
     calls' = kbGenScriptCalls script
     args' = kbGenScriptArgs script
-    in KnowledgeBase calls' args' [] []
+    in KnowledgeBase calls' args' [] [] []
 
 kbGenLambda :: Callable.LambdaContent -> KnowledgeBase
 kbGenLambda lambda = let
@@ -106,7 +119,41 @@ kbGenLambda lambda = let
     args' = kbGenArgs (Callable.lambdaBody lambda)
     lambdas' = [ KBLambda (Callable.lambdaLocation lambda) ]
     params' = extractLambdaParams lambda
-    in KnowledgeBase calls' args' lambdas' params'
+    dataflow' = extractLambdaDataflow lambda
+    in KnowledgeBase calls' args' lambdas' params' dataflow'
+
+extractLambdaDataflow :: Callable.LambdaContent -> [ Edge ]
+extractLambdaDataflow lambda = extractLambdaDataflow' (Callable.lambdaBody lambda)
+
+extractLambdaDataflow' :: Cfg -> [ Edge ]
+extractLambdaDataflow' cfg = let
+    nodes = Cfg.actualNodes $ Cfg.nodes cfg
+    instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes)
+    in Data.List.foldl' (++) [] (dataflowEdges (Data.Set.toList instructions))
+
+dataflowEdges :: [ Bitcode.InstructionContent ] -> [[ Edge ]]
+dataflowEdges = Data.List.map dataflowEdges'
+
+dataflowEdges' :: Bitcode.InstructionContent -> [ Edge ]
+dataflowEdges' (Bitcode.Call call)           = dataflowCallEdges call
+dataflowEdges' (Bitcode.Assign assign)       = [ dataflowAssignEdge assign ]
+dataflowEdges' (Bitcode.FieldRead fieldRead) = [ dataflowFieldReadEdge fieldRead ]
+dataflowEdges' _ = []
+
+dataflowCallEdges :: Bitcode.CallContent -> [ Edge ]
+dataflowCallEdges c = dataflowCallArgsEdges (Bitcode.callOutput c) (Bitcode.args c)
+
+dataflowCallArgsEdges :: Bitcode.Variable -> [ Bitcode.Variable ] -> [ Edge ]
+dataflowCallArgsEdges output = Data.List.map $ dataflowCallArgEdge output
+
+dataflowCallArgEdge :: Bitcode.Variable -> Bitcode.Variable -> Edge
+dataflowCallArgEdge output arg = Edge { from = arg, to = output }
+
+dataflowAssignEdge :: Bitcode.AssignContent -> Edge
+dataflowAssignEdge a = Edge { from = Bitcode.assignInput a, to = Bitcode.assignOutput a }
+
+dataflowFieldReadEdge :: Bitcode.FieldReadContent -> Edge
+dataflowFieldReadEdge f = Edge { from = Bitcode.fieldReadInput f, to = Bitcode.fieldReadOutput f } 
 
 extractLambdaParams :: Callable.LambdaContent -> [ Param ]
 extractLambdaParams lambda = extractLambdaParams' (Callable.lambdaLocation lambda) (Callable.lambdaBody lambda)
