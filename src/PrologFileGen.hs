@@ -28,8 +28,21 @@ toPrologFile kb = let
     calls = toPrologFileCalls (KnowledgeBase.calls kb)
     params = toPrologFileParams (KnowledgeBase.params kb)
     args = toPrologFileArgs (KnowledgeBase.args kb)
+    lambdas = toPrologFileLambdas (KnowledgeBase.lambdas kb)
     -- dataflow = toPrologFileDataflow (KnowledgeBase.dataflow kb)
-    in PrologFile (calls ++ params ++ args) -- ++ dataflow)
+    in PrologFile (calls ++ params ++ args ++ lambdas) -- ++ dataflow)
+
+toPrologFileLambdas :: [ KnowledgeBase.KBLambda ] -> [ String ]
+toPrologFileLambdas lambdas = Data.List.foldl' (++) [] (toPrologFileLambdas' lambdas)
+
+toPrologFileLambdas' :: [ KnowledgeBase.KBLambda ] -> [[ String ]]
+toPrologFileLambdas' = Data.List.map toPrologFileLambda
+
+toPrologFileLambda :: KnowledgeBase.KBLambda -> [ String ]
+toPrologFileLambda lambda = let
+    location = KnowledgeBase.lambdaLocation lambda
+    locstring = stringify location
+    in [ "kb_callable( " ++ locstring ++ " )." ]
 
 toPrologFileArgs :: [ KnowledgeBase.Arg ] -> [ String ]
 toPrologFileArgs args = Data.List.foldl' (++) [] (toPrologFileArgs' args)
