@@ -10,6 +10,7 @@ where
 import Location ( Location )
 
 -- project qualified imports
+import qualified Fqn
 import qualified Token
 import qualified KbGen as KnowledgeBase
 import qualified Location
@@ -40,7 +41,10 @@ toPrologFileCall :: KnowledgeBase.Call -> [ String ]
 toPrologFileCall call = let
     location = KnowledgeBase.callLocation call
     locstring = stringify location
-    in [ "kb_call( " ++ locstring ++ " )." ]
+    theCall = "kb_call( " ++ locstring ++ " )."
+    quotedFqn = "'" ++ Fqn.content (KnowledgeBase.calleeFqn call) ++ "'"
+    theFqn = "kb_has_fqn( " ++ locstring ++ ", " ++ quotedFqn ++ ")."
+    in [ theCall, theFqn ]
 
 toPrologFileParams :: [ KnowledgeBase.Param ] -> [ String ]
 toPrologFileParams params = Data.List.foldl' (++) [] (toPrologFileParams' params)
