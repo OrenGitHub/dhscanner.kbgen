@@ -29,8 +29,20 @@ toPrologFile kb = let
     params = toPrologFileParams (KnowledgeBase.params kb)
     args = toPrologFileArgs (KnowledgeBase.args kb)
     lambdas = toPrologFileLambdas (KnowledgeBase.lambdas kb)
-    -- dataflow = toPrologFileDataflow (KnowledgeBase.dataflow kb)
-    in PrologFile (calls ++ params ++ args ++ lambdas) -- ++ dataflow)
+    dataflow = toPrologFileDataflow (KnowledgeBase.dataflow kb)
+    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow)
+
+toPrologFileDataflow :: [ KnowledgeBase.Edge ] -> [ String ]
+toPrologFileDataflow edges = Data.List.foldl' (++) [] (toPrologFileEdges edges)
+
+toPrologFileEdges :: [ KnowledgeBase.Edge ] -> [[ String ]]
+toPrologFileEdges = Data.List.map toPrologFileEdge
+
+toPrologFileEdge :: KnowledgeBase.Edge -> [ String ]
+toPrologFileEdge edge = let
+    u = stringify $ Bitcode.locationVariable (KnowledgeBase.from edge)
+    v = stringify $ Bitcode.locationVariable (KnowledgeBase.to edge)
+    in [ "kb_dataflow_edge( " ++ u ++ ", " ++ v ++ " )." ]
 
 toPrologFileLambdas :: [ KnowledgeBase.KBLambda ] -> [ String ]
 toPrologFileLambdas lambdas = Data.List.foldl' (++) [] (toPrologFileLambdas' lambdas)
@@ -86,8 +98,8 @@ toPrologFileParam param = let
     location = Token.getParamNameLocation (KnowledgeBase.paramName param)
     locstring = stringify location
     fact1 = "kb_param( " ++ locstring ++ " )."
-    fact2 = "kb_param_has_name(" ++ locstring ++ "," ++ name ++ ")."
-    fact3 = "kb_callable_has_param(" ++ locstring ++ "," ++ callable ++ ")."
+    fact2 = "kb_param_has_name(" ++ locstring ++ "," ++ "'" ++ name ++ "'" ++ ")."
+    fact3 = "kb_callable_has_param( " ++ callable ++ ", " ++ locstring ++ " )."
     in [ fact1, fact2, fact3 ]
 
 stringify :: Location -> String
