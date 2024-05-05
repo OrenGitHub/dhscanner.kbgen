@@ -141,13 +141,16 @@ dataflowEdges' (Bitcode.FieldRead fieldRead) = [ dataflowFieldReadEdge fieldRead
 dataflowEdges' _ = []
 
 dataflowCallEdges :: Bitcode.CallContent -> [ Edge ]
-dataflowCallEdges c = dataflowCallArgsEdges (Bitcode.callOutput c) (Bitcode.args c)
+dataflowCallEdges c = let
+    everyArgToOutput = dataflowCallArgsEdges (Bitcode.callOutput c) (Bitcode.args c)
+    calleeToOutput = edgify (Bitcode.callOutput c) (Bitcode.callee c)
+    in calleeToOutput : everyArgToOutput 
 
 dataflowCallArgsEdges :: Bitcode.Variable -> [ Bitcode.Variable ] -> [ Edge ]
-dataflowCallArgsEdges output = Data.List.map $ dataflowCallArgEdge output
+dataflowCallArgsEdges output = Data.List.map $ edgify output
 
-dataflowCallArgEdge :: Bitcode.Variable -> Bitcode.Variable -> Edge
-dataflowCallArgEdge output arg = Edge { from = arg, to = output }
+edgify :: Bitcode.Variable -> Bitcode.Variable -> Edge
+edgify output arg = Edge { from = arg, to = output }
 
 dataflowAssignEdge :: Bitcode.AssignContent -> Edge
 dataflowAssignEdge a = Edge { from = Bitcode.assignInput a, to = Bitcode.assignOutput a }
