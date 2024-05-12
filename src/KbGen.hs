@@ -105,7 +105,15 @@ kbGen'' :: Callable -> KnowledgeBase
 kbGen'' (Callable.Script script) = kbGenScript script
 kbGen'' (Callable.Lambda lambda) = kbGenLambda lambda
 kbGen'' (Callable.Method method) = emptyKnowledgeBase
-kbGen'' (Callable.Function func) = emptyKnowledgeBase
+kbGen'' (Callable.Function func) = kbGenFunction func
+
+kbGenFunction :: Callable.FunctionContent -> KnowledgeBase
+kbGenFunction func = let
+    calls' = kbGenCalls (Callable.funcBody func)
+    args' = kbGenArgs (Callable.funcBody func)
+    params' = extractFunctionParams func
+    dataflow' = extractFunctionDataflow func
+    in KnowledgeBase calls' args' [] params' dataflow' 
 
 kbGenScript :: Callable.ScriptContent -> KnowledgeBase
 kbGenScript script = let
@@ -122,11 +130,14 @@ kbGenLambda lambda = let
     dataflow' = extractLambdaDataflow lambda
     in KnowledgeBase calls' args' lambdas' params' dataflow'
 
-extractLambdaDataflow :: Callable.LambdaContent -> [ Edge ]
-extractLambdaDataflow lambda = extractLambdaDataflow' (Callable.lambdaBody lambda)
+extractFunctionDataflow :: Callable.FunctionContent -> [ Edge ]
+extractFunctionDataflow func = extractDataflow (Callable.funcBody func)
 
-extractLambdaDataflow' :: Cfg -> [ Edge ]
-extractLambdaDataflow' cfg = let
+extractLambdaDataflow :: Callable.LambdaContent -> [ Edge ]
+extractLambdaDataflow lambda = extractDataflow (Callable.lambdaBody lambda)
+
+extractDataflow :: Cfg -> [ Edge ]
+extractDataflow cfg = let
     nodes = Cfg.actualNodes $ Cfg.nodes cfg
     instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes)
     in Data.List.foldl' (++) [] (dataflowEdges (Data.Set.toList instructions))
@@ -159,10 +170,13 @@ dataflowFieldReadEdge :: Bitcode.FieldReadContent -> Edge
 dataflowFieldReadEdge f = Edge { from = Bitcode.fieldReadInput f, to = Bitcode.fieldReadOutput f } 
 
 extractLambdaParams :: Callable.LambdaContent -> [ Param ]
-extractLambdaParams lambda = extractLambdaParams' (Callable.lambdaLocation lambda) (Callable.lambdaBody lambda)
+extractLambdaParams lambda = extractParams (Callable.lambdaLocation lambda) (Callable.lambdaBody lambda)
 
-extractLambdaParams' :: Location -> Cfg -> [ Param ]
-extractLambdaParams' location cfg = let
+extractFunctionParams :: Callable.FunctionContent -> [ Param ]
+extractFunctionParams f = extractParams (Token.getFuncNameLocation (Callable.funcName f)) (Callable.funcBody f)
+
+extractParams :: Location -> Cfg -> [ Param ]
+extractParams location cfg = let
     nodes = Cfg.actualNodes $ Cfg.nodes cfg
     instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes)
     paramDecls = catMaybes (Data.Set.toList (Data.Set.map keepParamDecls instructions))
