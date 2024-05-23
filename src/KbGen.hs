@@ -218,8 +218,12 @@ keepParamDecls :: Bitcode.InstructionContent -> Maybe Bitcode.ParamDeclContent
 keepParamDecls (Bitcode.ParamDecl paramDecl) = Just paramDecl
 keepParamDecls _ = Nothing
 
+removeNondetCalls :: Bitcode.Variable -> Bitcode.CallContent -> Maybe Bitcode.CallContent
+removeNondetCalls (Bitcode.SrcVariableCtor _) _ = Nothing
+removeNondetCalls _ call = Just call
+
 keepCalls :: Bitcode.InstructionContent -> Maybe Bitcode.CallContent
-keepCalls (Bitcode.Call call) = Just call 
+keepCalls (Bitcode.Call call) = removeNondetCalls (Bitcode.callee call) call
 keepCalls _ = Nothing
 
 combine :: [ Fqn ] -> [ Location ] -> [ Call ]
