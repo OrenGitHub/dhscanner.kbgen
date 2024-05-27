@@ -170,6 +170,7 @@ dataflowEdges = Data.List.map dataflowEdges'
 
 dataflowEdges' :: Bitcode.InstructionContent -> [ Edge ]
 dataflowEdges' (Bitcode.Call call)           = dataflowCallEdges call
+dataflowEdges' (Bitcode.Binop binop)         = dataflowBinopEdge binop
 dataflowEdges' (Bitcode.Assign assign)       = [ dataflowAssignEdge assign ]
 dataflowEdges' (Bitcode.FieldRead fieldRead) = [ dataflowFieldReadEdge fieldRead ]
 dataflowEdges' _ = []
@@ -185,6 +186,12 @@ dataflowCallArgsEdges output = Data.List.map $ edgify output
 
 edgify :: Bitcode.Variable -> Bitcode.Variable -> Edge
 edgify output arg = Edge { from = arg, to = output }
+
+dataflowBinopEdge :: Bitcode.BinopContent -> [ Edge ]
+dataflowBinopEdge b = let
+    e1 = Edge { from = Bitcode.binopLhs b, to = Bitcode.binopOutput b }
+    e2 = Edge { from = Bitcode.binopRhs b, to = Bitcode.binopOutput b }
+    in [ e1, e2 ]
 
 dataflowAssignEdge :: Bitcode.AssignContent -> Edge
 dataflowAssignEdge a = Edge { from = Bitcode.assignInput a, to = Bitcode.assignOutput a }
