@@ -199,7 +199,7 @@ extractFunctionParams :: Callable.FunctionContent -> [ Param ]
 extractFunctionParams f = extractParams (Token.getFuncNameLocation (Callable.funcName f)) (Callable.funcBody f)
 
 extractMethodParams :: Callable.MethodContent -> [ Param ]
-extractMethodParams m = extractParams (Token.getMethodNameLocation (Callable.methodName m)) (Callable.methodBody m)
+extractMethodParams m = extractParams (Callable.methodLocation m) (Callable.methodBody m)
 
 extractParams :: Location -> Cfg -> [ Param ]
 extractParams location cfg = let
