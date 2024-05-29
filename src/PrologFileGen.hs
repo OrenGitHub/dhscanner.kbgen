@@ -57,17 +57,20 @@ toPrologFileLambda lambda = let
     locstring = stringify location
     in [ "kb_callable( " ++ locstring ++ " )." ]
 
-toPrologFileFuncs :: [ KnowledgeBase.KBFunc ] -> [ String ]
+toPrologFileFuncs :: [ KnowledgeBase.KBCallable ] -> [ String ]
 toPrologFileFuncs funcs = Data.List.foldl' (++) [] (toPrologFileFuncs' funcs)
 
-toPrologFileFuncs' :: [ KnowledgeBase.KBFunc ] -> [[ String ]]
+toPrologFileFuncs' :: [ KnowledgeBase.KBCallable ] -> [[ String ]]
 toPrologFileFuncs' = Data.List.map toPrologFileFunc
 
-toPrologFileFunc :: KnowledgeBase.KBFunc -> [ String ]
+toPrologFileFunc :: KnowledgeBase.KBCallable -> [ String ]
 toPrologFileFunc func = let
+    quotedFqn = "'" ++ Fqn.content (KnowledgeBase.callableFqn func) ++ "'"
     location = KnowledgeBase.funcLocation func
     locstring = stringify location
-    in [ "kb_callable( " ++ locstring ++ " )." ]
+    callable_loc = "kb_callable( " ++ locstring ++ " )."
+    callable_fqn = "kb_has_fqn( " ++ locstring ++ ", " ++ quotedFqn ++ " )."
+    in [ callable_loc, callable_fqn ]
 
 toPrologFileArgs :: [ KnowledgeBase.Arg ] -> [ String ]
 toPrologFileArgs args = Data.List.foldl' (++) [] (toPrologFileArgs' args)

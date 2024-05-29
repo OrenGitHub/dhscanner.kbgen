@@ -36,7 +36,7 @@ data KnowledgeBase
           lambdas :: [ KBLambda ],
           params :: [ Param ],
           dataflow :: [ Edge ],
-          funcs :: [ KBFunc ]
+          funcs :: [ KBCallable ]
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -73,9 +73,10 @@ data KBLambda
      }
      deriving ( Show, Generic, ToJSON )
 
-data KBFunc
-   = KBFunc
+data KBCallable
+   = KBCallable
      {
+         callableFqn :: Fqn,
          funcLocation :: Location
      }
      deriving ( Show, Generic, ToJSON )
@@ -123,7 +124,7 @@ kbGenMethod method = let
     args' = kbGenArgs (Callable.methodBody method)
     params' = extractMethodParams method
     dataflow' = extractMethodDataflow method
-    funcs' = [ KBFunc (Callable.methodLocation method) ]
+    funcs' = [ KBCallable (fqnifyMethod method) (Callable.methodLocation method) ]
     in KnowledgeBase calls' args' [] params' dataflow' funcs' 
 
 kbGenFunction :: Callable.FunctionContent -> KnowledgeBase
@@ -132,7 +133,7 @@ kbGenFunction func = let
     args' = kbGenArgs (Callable.funcBody func)
     params' = extractFunctionParams func
     dataflow' = extractFunctionDataflow func
-    funcs' = [ KBFunc (Callable.funcLocation func) ]
+    funcs' = [ KBCallable (fqnifyFunc func) (Callable.funcLocation func) ]
     in KnowledgeBase calls' args' [] params' dataflow' funcs' 
 
 kbGenScript :: Callable.ScriptContent -> KnowledgeBase
@@ -149,6 +150,17 @@ kbGenLambda lambda = let
     params' = extractLambdaParams lambda
     dataflow' = extractLambdaDataflow lambda
     in KnowledgeBase calls' args' lambdas' params' dataflow' []
+
+fqnifyMethod :: Callable.MethodContent -> Fqn
+fqnifyMethod method = let
+    rawMethodName = Token.content (Token.getMethdNameToken (Callable.methodName method))
+    hostingClassName = Token.content (Token.getClassNameToken (Callable.hostingClassName method))
+    in Fqn (hostingClassName ++ "." ++ rawMethodName)
+
+fqnifyFunc :: Callable.FunctionContent -> Fqn
+fqnifyFunc func = let
+    funcName = Token.content (Token.getFuncNameToken (Callable.funcName func))
+    in Fqn funcName
 
 extractFunctionDataflow :: Callable.FunctionContent -> [ Edge ]
 extractFunctionDataflow func = extractDataflow (Callable.funcBody func)
