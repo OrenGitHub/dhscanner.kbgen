@@ -31,7 +31,8 @@ toPrologFile kb = let
     lambdas = toPrologFileLambdas (KnowledgeBase.lambdas kb)
     dataflow = toPrologFileDataflow (KnowledgeBase.dataflow kb)
     funcs = toPrologFileFuncs (KnowledgeBase.funcs kb)
-    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs)
+    subclasses = toPrologFileSubclasses (KnowledgeBase.subclasses kb)
+    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses)
 
 toPrologFileDataflow :: [ KnowledgeBase.Edge ] -> [ String ]
 toPrologFileDataflow edges = Data.List.foldl' (++) [] (toPrologFileEdges edges)
@@ -47,6 +48,21 @@ toPrologFileEdge edge = let
     fqnU = "kb_has_fqn( " ++ u ++ ", " ++ "'" ++ Fqn.content (Bitcode.variableFqn (KnowledgeBase.from edge)) ++ "'" ++ " )."
     fqnV = "kb_has_fqn( " ++ v ++ ", " ++ "'" ++ Fqn.content (Bitcode.variableFqn (KnowledgeBase.to edge)) ++ "'" ++ " )."
     in [ dataflowEdge, fqnU, fqnV ]
+
+toPrologFileSubclasses :: [(Token.ClassName, Token.SuperName)] -> [ String ]
+toPrologFileSubclasses tuples = Data.List.foldl' (++) [] (toPrologFileSubclasses' tuples)
+
+toPrologFileSubclasses' :: [(Token.ClassName, Token.SuperName)] -> [[ String ]]
+toPrologFileSubclasses' = Data.List.map toPrologFileSubclass
+
+toPrologFileSubclass :: (Token.ClassName, Token.SuperName) -> [ String ]
+toPrologFileSubclass (c,s) = let
+    c' = Token.content (Token.getClassNameToken c)
+    s' = Token.content (Token.getSuperNameToken s)
+    subclass = "kb_subclass_of( " ++ c' ++ ", " ++ s' ++ " )."
+    className = "kb_class_name( " ++ c' ++ ", " ++ "'" ++ c' ++ "'" ++ " )."
+    superName = "kb_class_name( " ++ s' ++ ", " ++ "'" ++ s' ++ "'" ++ " )."
+    in [ className, superName, subclass ]
 
 toPrologFileLambdas :: [ KnowledgeBase.KBLambda ] -> [ String ]
 toPrologFileLambdas lambdas = Data.List.foldl' (++) [] (toPrologFileLambdas' lambdas)
