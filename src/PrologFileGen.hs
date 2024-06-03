@@ -116,7 +116,7 @@ toPrologFileCall call = let
     locstring = stringify location
     theCall = "kb_call( " ++ locstring ++ " )."
     quotedFqn = "'" ++ Fqn.content (KnowledgeBase.calleeFqn call) ++ "'"
-    theFqn = "kb_has_fqn( " ++ locstring ++ ", " ++ quotedFqn ++ ")."
+    theFqn = "kb_has_fqn( " ++ locstring ++ ", " ++ quotedFqn ++ " )."
     in [ theCall, theFqn ]
 
 toPrologFileParams :: [ KnowledgeBase.Param ] -> [ String ]
