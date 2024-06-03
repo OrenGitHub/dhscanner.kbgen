@@ -43,7 +43,10 @@ toPrologFileEdge :: KnowledgeBase.Edge -> [ String ]
 toPrologFileEdge edge = let
     u = stringify $ Bitcode.locationVariable (KnowledgeBase.from edge)
     v = stringify $ Bitcode.locationVariable (KnowledgeBase.to edge)
-    in [ "kb_dataflow_edge( " ++ u ++ ", " ++ v ++ " )." ]
+    dataflowEdge = "kb_dataflow_edge( " ++ u ++ ", " ++ v ++ " )."
+    fqnU = "kb_has_fqn( " ++ u ++ ", " ++ "'" ++ Fqn.content (Bitcode.variableFqn (KnowledgeBase.from edge)) ++ "'" ++ " )."
+    fqnV = "kb_has_fqn( " ++ v ++ ", " ++ "'" ++ Fqn.content (Bitcode.variableFqn (KnowledgeBase.to edge)) ++ "'" ++ " )."
+    in [ dataflowEdge, fqnU, fqnV ]
 
 toPrologFileLambdas :: [ KnowledgeBase.KBLambda ] -> [ String ]
 toPrologFileLambdas lambdas = Data.List.foldl' (++) [] (toPrologFileLambdas' lambdas)
