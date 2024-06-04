@@ -37,7 +37,8 @@ data KnowledgeBase
           params :: [ Param ],
           dataflow :: [ Edge ],
           funcs :: [ KBCallable ],
-          subclasses :: [(Token.ClassName,Token.SuperName)]
+          subclasses :: [(Token.ClassName,Token.SuperName)],
+          methodsof :: [(Token.MethdName, Location, Token.ClassName)]
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -93,7 +94,7 @@ data Param
      deriving ( Show, Generic, ToJSON )
 
 emptyKnowledgeBase :: KnowledgeBase
-emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] []
+emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] [] []
 
 -- | API: generate a prolog knowledge base from
 -- a collection of callables
@@ -112,7 +113,8 @@ kbGen' (c:cs) = let
     dataflow' = (dataflow kb) ++ (dataflow rest)
     funcs' = (funcs kb) ++ (funcs rest)
     subclasses' = (subclasses kb) ++ (subclasses rest)
-    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' 
+    methodsof' = (methodsof kb) ++ (methodsof rest)
+    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' methodsof'
 
 kbGen'' :: Callable -> KnowledgeBase
 kbGen'' (Callable.Script script) = kbGenScript script
@@ -130,7 +132,8 @@ kbGenMethod method = let
     hostingClass = Callable.hostingClassName method
     supers = Callable.hostingClassSupers method
     subclasses' = [(hostingClass, s) | s <- supers ]
-    in KnowledgeBase calls' args' [] params' dataflow' funcs' subclasses'
+    methodsof' = [(Callable.methodName method, Callable.methodLocation method, hostingClass)]
+    in KnowledgeBase calls' args' [] params' dataflow' funcs' subclasses' methodsof'
 
 kbGenFunction :: Callable.FunctionContent -> KnowledgeBase
 kbGenFunction func = let
@@ -139,13 +142,13 @@ kbGenFunction func = let
     params' = extractFunctionParams func
     dataflow' = extractFunctionDataflow func
     funcs' = [ KBCallable (fqnifyFunc func) (Callable.funcLocation func) ]
-    in KnowledgeBase calls' args' [] params' dataflow' funcs' []
+    in KnowledgeBase calls' args' [] params' dataflow' funcs' [] []
 
 kbGenScript :: Callable.ScriptContent -> KnowledgeBase
 kbGenScript script = let
     calls' = kbGenScriptCalls script
     args' = kbGenScriptArgs script
-    in KnowledgeBase calls' args' [] [] [] [] []
+    in KnowledgeBase calls' args' [] [] [] [] [] []
 
 kbGenLambda :: Callable.LambdaContent -> KnowledgeBase
 kbGenLambda lambda = let
@@ -154,7 +157,7 @@ kbGenLambda lambda = let
     lambdas' = [ KBLambda (Callable.lambdaLocation lambda) ]
     params' = extractLambdaParams lambda
     dataflow' = extractLambdaDataflow lambda
-    in KnowledgeBase calls' args' lambdas' params' dataflow' [] []
+    in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] []
 
 fqnifyMethod :: Callable.MethodContent -> Fqn
 fqnifyMethod method = let

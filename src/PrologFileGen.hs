@@ -32,7 +32,19 @@ toPrologFile kb = let
     dataflow = toPrologFileDataflow (KnowledgeBase.dataflow kb)
     funcs = toPrologFileFuncs (KnowledgeBase.funcs kb)
     subclasses = toPrologFileSubclasses (KnowledgeBase.subclasses kb)
-    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses)
+    methodsof = toPrologFileMethodsof (KnowledgeBase.methodsof kb)
+    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof)
+
+toPrologFileMethodsof :: [(Token.MethdName, Location, Token.ClassName)] -> [ String ]
+toPrologFileMethodsof methods = Data.List.foldl' (++) [] (toPrologFileMethodsof' methods)
+
+toPrologFileMethodsof' :: [(Token.MethdName, Location, Token.ClassName)] -> [[ String ]]
+toPrologFileMethodsof' = Data.List.map toPrologFileMethodof
+
+toPrologFileMethodof :: (Token.MethdName, Location, Token.ClassName) -> [ String ]
+toPrologFileMethodof (_, loc, c) = let
+    locBased = "kb_method_of_class( " ++ (stringify loc) ++ ", " ++ (Token.content (Token.getClassNameToken c)) ++ " )."
+    in [ locBased ]
 
 toPrologFileDataflow :: [ KnowledgeBase.Edge ] -> [ String ]
 toPrologFileDataflow edges = Data.List.foldl' (++) [] (toPrologFileEdges edges)
