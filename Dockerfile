@@ -5,7 +5,7 @@ RUN apt-get install vim -y
 RUN echo "set number" > ~/.vimrc
 RUN echo "set incsearch" >> ~/.vimrc
 RUN echo "syntax on" >> ~/.vimrc
-WORKDIR /codegen
+WORKDIR /kbgen
 COPY dhscanner.cabal dhscanner.cabal
 RUN cabal build --only-dependencies
 COPY dhscanner.ast dhscanner.ast
