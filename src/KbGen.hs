@@ -79,10 +79,10 @@ data KBCallable
    = KBCallable
      {
          callableFqn :: Fqn,
-         funcLocation :: Location
+         callableAnnotations :: [ Callable.Annotation ],
+         callableLocation :: Location
      }
      deriving ( Show, Generic, ToJSON )
-
 
 data Param
    = Param
@@ -128,7 +128,7 @@ kbGenMethod method = let
     args' = kbGenArgs (Callable.methodBody method)
     params' = extractMethodParams method
     dataflow' = extractMethodDataflow method
-    funcs' = [ KBCallable (fqnifyMethod method) (Callable.methodLocation method) ]
+    funcs' = [ KBCallable (fqnifyMethod method) [] (Callable.methodLocation method) ]
     hostingClass = Callable.hostingClassName method
     supers = Callable.hostingClassSupers method
     subclasses' = [(hostingClass, s) | s <- supers ]
@@ -141,7 +141,8 @@ kbGenFunction func = let
     args' = kbGenArgs (Callable.funcBody func)
     params' = extractFunctionParams func
     dataflow' = extractFunctionDataflow func
-    funcs' = [ KBCallable (fqnifyFunc func) (Callable.funcLocation func) ]
+    annotations' = Callable.funcAnnotations func
+    funcs' = [ KBCallable (fqnifyFunc func) annotations' (Callable.funcLocation func) ]
     in KnowledgeBase calls' args' [] params' dataflow' funcs' [] []
 
 kbGenScript :: Callable.ScriptContent -> KnowledgeBase

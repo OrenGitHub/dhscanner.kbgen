@@ -15,6 +15,7 @@ import qualified Token
 import qualified KbGen as KnowledgeBase
 import qualified Location
 import qualified Bitcode
+import qualified Callable
 
 -- general imports
 import Data.List
@@ -92,16 +93,19 @@ toPrologFileFuncs :: [ KnowledgeBase.KBCallable ] -> [ String ]
 toPrologFileFuncs funcs = Data.List.foldl' (++) [] (toPrologFileFuncs' funcs)
 
 toPrologFileFuncs' :: [ KnowledgeBase.KBCallable ] -> [[ String ]]
-toPrologFileFuncs' = Data.List.map toPrologFileFunc
+toPrologFileFuncs' = Data.List.map toPrologFileCallable
 
-toPrologFileFunc :: KnowledgeBase.KBCallable -> [ String ]
-toPrologFileFunc func = let
-    quotedFqn = "'" ++ Fqn.content (KnowledgeBase.callableFqn func) ++ "'"
-    location = KnowledgeBase.funcLocation func
+toPrologFileCallable :: KnowledgeBase.KBCallable -> [ String ]
+toPrologFileCallable callable = let
+    quotedFqn = "'" ++ Fqn.content (KnowledgeBase.callableFqn callable) ++ "'"
+    location = KnowledgeBase.callableLocation callable
     locstring = stringify location
+    annotations = KnowledgeBase.callableAnnotations callable
+    annotation = case annotations of { [] -> "moishe.zuchmir"; ((Callable.Annotation a _):_) -> a }
     callable_loc = "kb_callable( " ++ locstring ++ " )."
     callable_fqn = "kb_has_fqn( " ++ locstring ++ ", " ++ quotedFqn ++ " )."
-    in [ callable_loc, callable_fqn ]
+    callable_annotation = "kb_callable_annotated_with( " ++ locstring ++ ", " ++ annotation ++ " )."
+    in [ callable_loc, callable_fqn, callable_annotation ]
 
 toPrologFileArgs :: [ KnowledgeBase.Arg ] -> [ String ]
 toPrologFileArgs args = Data.List.foldl' (++) [] (toPrologFileArgs' args)
