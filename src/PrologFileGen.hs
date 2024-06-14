@@ -102,9 +102,10 @@ toPrologFileCallable callable = let
     locstring = stringify location
     annotations = KnowledgeBase.callableAnnotations callable
     annotation = case annotations of { [] -> "moishe.zuchmir"; ((Callable.Annotation a _):_) -> a }
+    quotedAnnotation = "'" ++ annotation ++ "'"
     callable_loc = "kb_callable( " ++ locstring ++ " )."
     callable_fqn = "kb_has_fqn( " ++ locstring ++ ", " ++ quotedFqn ++ " )."
-    callable_annotation = "kb_callable_annotated_with( " ++ locstring ++ ", " ++ annotation ++ " )."
+    callable_annotation = "kb_callable_annotated_with( " ++ locstring ++ ", " ++ quotedAnnotation ++ " )."
     in [ callable_loc, callable_fqn, callable_annotation ]
 
 toPrologFileArgs :: [ KnowledgeBase.Arg ] -> [ String ]
