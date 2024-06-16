@@ -34,7 +34,7 @@ common warnings
     
     ghc-options: -Wall
 
-executable codegen
+executable kbgen
 
     import: warnings
 
