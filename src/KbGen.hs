@@ -251,7 +251,10 @@ keepParamDecls (Bitcode.ParamDecl paramDecl) = Just paramDecl
 keepParamDecls _ = Nothing
 
 removeNondetCalls :: Bitcode.Variable -> Bitcode.CallContent -> Maybe Bitcode.CallContent
-removeNondetCalls (Bitcode.SrcVariableCtor _) _ = Nothing
+removeNondetCalls (Bitcode.SrcVariableCtor (Bitcode.SrcVariable _ (Token.VarName (Token.Named name _)))) call = case name of {
+    "nondet" -> Nothing;
+    _ -> Just call
+}
 removeNondetCalls _ call = Just call
 
 keepCalls :: Bitcode.InstructionContent -> Maybe Bitcode.CallContent
