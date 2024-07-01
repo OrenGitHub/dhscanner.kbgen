@@ -19,6 +19,7 @@ import qualified Callable
 
 -- general imports
 import Data.List
+import Data.Text ( replace, pack, unpack )
 import Data.Aeson
 import GHC.Generics
 
@@ -53,13 +54,16 @@ toPrologFileDataflow edges = Data.List.foldl' (++) [] (toPrologFileEdges edges)
 toPrologFileEdges :: [ KnowledgeBase.Edge ] -> [[ String ]]
 toPrologFileEdges = Data.List.map toPrologFileEdge
 
+omitNewFromFqn :: String -> String
+omitNewFromFqn fqn = unpack (replace (pack ".new.") (pack ".") (pack fqn))
+
 toPrologFileEdge :: KnowledgeBase.Edge -> [ String ]
 toPrologFileEdge edge = let
     u = stringify $ Bitcode.locationVariable (KnowledgeBase.from edge)
     v = stringify $ Bitcode.locationVariable (KnowledgeBase.to edge)
     dataflowEdge = "kb_dataflow_edge( " ++ u ++ ", " ++ v ++ " )."
-    fqnU = "kb_has_fqn( " ++ u ++ ", " ++ "'" ++ Fqn.content (Bitcode.variableFqn (KnowledgeBase.from edge)) ++ "'" ++ " )."
-    fqnV = "kb_has_fqn( " ++ v ++ ", " ++ "'" ++ Fqn.content (Bitcode.variableFqn (KnowledgeBase.to edge)) ++ "'" ++ " )."
+    fqnU = "kb_has_fqn( " ++ u ++ ", " ++ "'" ++ omitNewFromFqn (Fqn.content (Bitcode.variableFqn (KnowledgeBase.from edge))) ++ "'" ++ " )."
+    fqnV = "kb_has_fqn( " ++ v ++ ", " ++ "'" ++ omitNewFromFqn (Fqn.content (Bitcode.variableFqn (KnowledgeBase.to   edge))) ++ "'" ++ " )."
     in [ dataflowEdge, fqnU, fqnV ]
 
 toPrologFileSubclasses :: [(Token.ClassName, Token.SuperName)] -> [ String ]
@@ -104,7 +108,7 @@ toPrologFileCallable callable = let
     annotation = case annotations of { [] -> "moishe.zuchmir"; ((Callable.Annotation a _):_) -> a }
     quotedAnnotation = "'" ++ annotation ++ "'"
     callable_loc = "kb_callable( " ++ locstring ++ " )."
-    callable_fqn = "kb_has_fqn( " ++ locstring ++ ", " ++ quotedFqn ++ " )."
+    callable_fqn = "kb_has_fqn( " ++ locstring ++ ", " ++ (omitNewFromFqn quotedFqn) ++ " )."
     callable_annotation = "kb_callable_annotated_with( " ++ locstring ++ ", " ++ quotedAnnotation ++ " )."
     in [ callable_loc, callable_fqn, callable_annotation ]
 
@@ -133,7 +137,7 @@ toPrologFileCall call = let
     locstring = stringify location
     theCall = "kb_call( " ++ locstring ++ " )."
     quotedFqn = "'" ++ Fqn.content (KnowledgeBase.calleeFqn call) ++ "'"
-    theFqn = "kb_has_fqn( " ++ locstring ++ ", " ++ quotedFqn ++ " )."
+    theFqn = "kb_has_fqn( " ++ locstring ++ ", " ++ (omitNewFromFqn quotedFqn) ++ " )."
     in [ theCall, theFqn ]
 
 toPrologFileParams :: [ KnowledgeBase.Param ] -> [ String ]
