@@ -131,6 +131,16 @@ toPrologFileCalls calls = Data.List.foldl' (++) [] (toPrologFileCalls' calls)
 toPrologFileCalls' :: [ KnowledgeBase.Call ] -> [[ String ]]
 toPrologFileCalls' = Data.List.map toPrologFileCall
 
+addClassContextIfNeeded :: KnowledgeBase.Call -> [ String ]
+addClassContextIfNeeded call = let
+    location = KnowledgeBase.callLocation call
+    locstring = stringify location
+    rawFqn = Fqn.content (KnowledgeBase.calleeFqn call)
+    classContext = KnowledgeBase.callFromClass call
+    f = Token.content . Token.getClassNameToken
+    g = \s -> "kb_has_fqn( " ++ locstring ++ ", " ++ "'" ++ s ++ "." ++ rawFqn ++ "' )."
+    in case fmap (g . f) classContext of { Nothing -> []; Just oneMoreFact -> [ oneMoreFact ] }
+
 toPrologFileCall :: KnowledgeBase.Call -> [ String ]
 toPrologFileCall call = let
     location = KnowledgeBase.callLocation call
@@ -138,7 +148,7 @@ toPrologFileCall call = let
     theCall = "kb_call( " ++ locstring ++ " )."
     quotedFqn = "'" ++ Fqn.content (KnowledgeBase.calleeFqn call) ++ "'"
     theFqn = "kb_has_fqn( " ++ locstring ++ ", " ++ (omitNewFromFqn quotedFqn) ++ " )."
-    in [ theCall, theFqn ]
+    in [ theCall, theFqn ] ++ (addClassContextIfNeeded call)
 
 toPrologFileParams :: [ KnowledgeBase.Param ] -> [ String ]
 toPrologFileParams params = Data.List.foldl' (++) [] (toPrologFileParams' params)

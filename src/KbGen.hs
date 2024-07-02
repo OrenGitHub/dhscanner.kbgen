@@ -54,7 +54,8 @@ data Call
    = Call
      {
          calleeFqn :: Fqn,
-         callLocation :: Location
+         callLocation :: Location,
+         callFromClass :: Maybe Token.ClassName
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -124,12 +125,12 @@ kbGen'' (Callable.Function func) = kbGenFunction func
 
 kbGenMethod:: Callable.MethodContent -> KnowledgeBase
 kbGenMethod method = let
-    calls' = kbGenCalls (Callable.methodBody method)
+    hostingClass = Callable.hostingClassName method
+    calls' = kbGenCallsFromMethods (Callable.methodBody method) hostingClass
     args' = kbGenArgs (Callable.methodBody method)
     params' = extractMethodParams method
     dataflow' = extractMethodDataflow method
     funcs' = [ KBCallable (fqnifyMethod method) [] (Callable.methodLocation method) ]
-    hostingClass = Callable.hostingClassName method
     supers = Callable.hostingClassSupers method
     subclasses' = [(hostingClass, s) | s <- supers ]
     methodsof' = [(Callable.methodName method, Callable.methodLocation method, hostingClass)]
@@ -264,10 +265,25 @@ keepCalls _ = Nothing
 combine :: [ Fqn ] -> [ Location ] -> [ Call ]
 combine [] _ = []
 combine _ [] = []
-combine (fqn:fqns) (loc:locs) = (Call fqn loc) : (combine fqns locs)
+combine (fqn:fqns) (loc:locs) = (Call fqn loc Nothing) : (combine fqns locs)
+
+combine' :: [ Fqn ] -> [ Location ] -> Token.ClassName -> [ Call ]
+combine' [] _ _ = []
+combine' _ [] _ = []
+combine' (fqn:fqns) (loc:locs) className = (Call fqn loc (Just className)) : (combine' fqns locs className)
 
 kbGenScriptCalls :: Callable.ScriptContent -> [ Call ]
 kbGenScriptCalls = kbGenCalls . Callable.scriptBody
+
+kbGenCallsFromMethods :: Cfg -> Token.ClassName -> [ Call ]
+kbGenCallsFromMethods cfg className = let
+    nodes = Cfg.actualNodes $ Cfg.nodes cfg
+    instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes)
+    calls = catMaybes (Data.Set.toList (Data.Set.map keepCalls instructions))
+    callees = Data.List.map Bitcode.callee calls
+    fqns = Data.List.map Bitcode.variableFqn callees
+    locations = Data.List.map Bitcode.callLocation calls
+    in combine' fqns locations className
 
 kbGenCalls :: Cfg -> [ Call ]
 kbGenCalls cfg = let
