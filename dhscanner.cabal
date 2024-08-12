@@ -41,21 +41,14 @@ executable kbgen
     main-is: Main.hs
 
     other-modules:
-        Cfg,
-        Fqn,
-        Token,
         KbGen,
-        Bitcode,
-        Callable,
-        Location,
         PrologFileGen
 
-    -- LANGUAGE extensions used by modules in this package.
-    -- other-extensions:
-
     build-depends:
-        base ^>=4.19.0.0,
+        base,
         containers,
+        dhscanner-ast >= 0.1.0.1,
+        dhscanner-bitcode,
         aeson,
         array,
         yesod,
@@ -63,8 +56,6 @@ executable kbgen
         mtl
 
     hs-source-dirs:
-        src,
-        dhscanner.ast/src,
-        dhscanner.bitcode/src
+        src
 
     default-language: Haskell2010
