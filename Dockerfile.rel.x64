@@ -1,0 +1,4 @@
+FROM haskell:9.4.8
+RUN wget https://github.com/OrenGitHub/dhscanner.kbgen/releases/download/v0.0.5/kbgen.x64
+RUN chmod +x kbgen.x64
+CMD ["./kbgen.x64"]
