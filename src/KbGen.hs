@@ -38,7 +38,8 @@ data KnowledgeBase
           dataflow :: [ Edge ],
           funcs :: [ KBCallable ],
           subclasses :: [(Token.ClassName,Token.SuperName)],
-          methodsof :: [(Token.MethdName, Location, Token.ClassName)]
+          methodsof :: [(Token.MethdName, Location, Token.ClassName)],
+          methodvars :: [(Bitcode.Variable, Location)]
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -95,7 +96,7 @@ data Param
      deriving ( Show, Generic, ToJSON )
 
 emptyKnowledgeBase :: KnowledgeBase
-emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] [] []
+emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] [] [] []
 
 -- | API: generate a prolog knowledge base from
 -- a collection of callables
@@ -115,7 +116,8 @@ kbGen' (c:cs) = let
     funcs' = (funcs kb) ++ (funcs rest)
     subclasses' = (subclasses kb) ++ (subclasses rest)
     methodsof' = (methodsof kb) ++ (methodsof rest)
-    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' methodsof'
+    methodvars' = (methodvars kb) ++ (methodvars rest)
+    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' methodsof' methodvars'
 
 kbGen'' :: Callable -> KnowledgeBase
 kbGen'' (Callable.Script script) = kbGenScript script
@@ -128,13 +130,15 @@ kbGenMethod method = let
     hostingClass = Callable.hostingClassName method
     calls' = kbGenCallsFromMethods (Callable.methodBody method) hostingClass
     args' = kbGenArgs (Callable.methodBody method)
+    vars' = kbGenVars (Callable.methodBody method)
     params' = extractMethodParams method
     dataflow' = extractMethodDataflow method
     funcs' = [ KBCallable (fqnifyMethod method) [] (Callable.methodLocation method) ]
     supers = Callable.hostingClassSupers method
     subclasses' = [(hostingClass, s) | s <- supers ]
     methodsof' = [(Callable.methodName method, Callable.methodLocation method, hostingClass)]
-    in KnowledgeBase calls' args' [] params' dataflow' funcs' subclasses' methodsof'
+    methodvars' = [(v, Callable.methodLocation method) | v <- vars']
+    in KnowledgeBase calls' args' [] params' dataflow' funcs' subclasses' methodsof' methodvars'
 
 kbGenFunction :: Callable.FunctionContent -> KnowledgeBase
 kbGenFunction func = let
@@ -144,13 +148,13 @@ kbGenFunction func = let
     dataflow' = extractFunctionDataflow func
     annotations' = Callable.funcAnnotations func
     funcs' = [ KBCallable (fqnifyFunc func) annotations' (Callable.funcLocation func) ]
-    in KnowledgeBase calls' args' [] params' dataflow' funcs' [] []
+    in KnowledgeBase calls' args' [] params' dataflow' funcs' [] [] []
 
 kbGenScript :: Callable.ScriptContent -> KnowledgeBase
 kbGenScript script = let
     calls' = kbGenScriptCalls script
     args' = kbGenScriptArgs script
-    in KnowledgeBase calls' args' [] [] [] [] [] []
+    in KnowledgeBase calls' args' [] [] [] [] [] [] []
 
 kbGenLambda :: Callable.LambdaContent -> KnowledgeBase
 kbGenLambda lambda = let
@@ -159,7 +163,7 @@ kbGenLambda lambda = let
     lambdas' = [ KBLambda (Callable.lambdaLocation lambda) ]
     params' = extractLambdaParams lambda
     dataflow' = extractLambdaDataflow lambda
-    in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] []
+    in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] [] []
 
 fqnifyMethod :: Callable.MethodContent -> Fqn
 fqnifyMethod method = let
@@ -304,6 +308,12 @@ kbGenArgs cfg = let
     instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes) 
     calls = catMaybes (Data.Set.toList (Data.Set.map keepCalls instructions))
     in kbGenScriptArgsFromCalls calls 
+
+kbGenVars :: Cfg -> [ Bitcode.Variable ]
+kbGenVars cfg = let
+    nodes = Cfg.actualNodes $ Cfg.nodes cfg
+    instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes) 
+    in catMaybes (Data.Set.toList (Data.Set.map Bitcode.output instructions))
 
 kbGenScriptArgsFromCalls :: [ Bitcode.CallContent ] -> [ Arg ]
 kbGenScriptArgsFromCalls calls = Data.List.foldl' (++) [] (kbGenScriptArgsFromCalls' calls)

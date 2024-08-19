@@ -35,7 +35,17 @@ toPrologFile kb = let
     funcs = toPrologFileFuncs (KnowledgeBase.funcs kb)
     subclasses = toPrologFileSubclasses (KnowledgeBase.subclasses kb)
     methodsof = toPrologFileMethodsof (KnowledgeBase.methodsof kb)
-    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof)
+    methodvars = toPrologFileMethodvars (KnowledgeBase.methodvars kb)
+    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof ++ methodvars)
+
+toPrologFileMethodvars :: [(Bitcode.Variable, Location)] -> [ String ]
+toPrologFileMethodvars = Data.List.map toPrologFileMethodvar
+
+toPrologFileMethodvar :: (Bitcode.Variable, Location) -> String
+toPrologFileMethodvar (v, methodloc) = let
+    vstr = stringify (Bitcode.locationVariable v)
+    mstr = stringify methodloc
+    in "kb_var_in_method( " ++ vstr ++ ", " ++ mstr ++ " )."
 
 toPrologFileMethodsof :: [(Token.MethdName, Location, Token.ClassName)] -> [ String ]
 toPrologFileMethodsof methods = Data.List.foldl' (++) [] (toPrologFileMethodsof' methods)
