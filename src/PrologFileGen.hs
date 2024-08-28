@@ -170,12 +170,15 @@ toPrologFileParam :: KnowledgeBase.Param -> [ String ]
 toPrologFileParam param = let
     callable = stringify $ KnowledgeBase.callableContext param
     serialIdx = show $ KnowledgeBase.paramSerialIdx param
-    name = Token.content (Token.getParamNameToken (KnowledgeBase.paramName param))
-    location = Token.getParamNameLocation (KnowledgeBase.paramName param)
-    locstring = stringify location
-    fact1 = "kb_param( " ++ locstring ++ " )."
-    fact2 = "kb_param_has_name(" ++ locstring ++ "," ++ "'" ++ name ++ "'" ++ ")."
-    fact3 = "kb_callable_has_param( " ++ callable ++ ", " ++ locstring ++ " )."
+    token = Token.getParamNameToken (KnowledgeBase.paramName param)
+    name = Token.content token
+    locationCallable = KnowledgeBase.callableContext param
+    locstringCallable = stringify locationCallable
+    locationParam = Token.location token
+    locstringParam = stringify locationParam
+    fact1 = "kb_param( " ++ locstringParam ++ " )."
+    fact2 = "kb_param_has_name(" ++ locstringParam ++ "," ++ "'" ++ name ++ "'" ++ ")."
+    fact3 = "kb_callable_has_param( " ++ locstringCallable ++ ", " ++ locstringParam ++ " )."
     in [ fact1, fact2, fact3 ]
 
 stringify :: Location -> String

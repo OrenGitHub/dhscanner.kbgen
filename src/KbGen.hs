@@ -233,7 +233,7 @@ extractLambdaParams :: Callable.LambdaContent -> [ Param ]
 extractLambdaParams lambda = extractParams (Callable.lambdaLocation lambda) (Callable.lambdaBody lambda)
 
 extractFunctionParams :: Callable.FunctionContent -> [ Param ]
-extractFunctionParams f = extractParams (Token.getFuncNameLocation (Callable.funcName f)) (Callable.funcBody f)
+extractFunctionParams f = extractParams (Callable.funcLocation f) (Callable.funcBody f)
 
 extractMethodParams :: Callable.MethodContent -> [ Param ]
 extractMethodParams m = extractParams (Callable.methodLocation m) (Callable.methodBody m)
