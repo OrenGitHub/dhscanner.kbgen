@@ -67,6 +67,11 @@ toPrologFileEdges = Data.List.map toPrologFileEdge
 omitNewFromFqn :: String -> String
 omitNewFromFqn fqn = unpack (replace (pack ".new.") (pack ".") (pack fqn))
 
+-- Arrrggghh ... this is an ugly patch
+-- until I decide what to do with the fqns
+replaceConstructorNameInFqn :: String -> String
+replaceConstructorNameInFqn fqn = unpack (replace (pack ".initialize") (pack ".new") (pack fqn))
+
 toPrologFileEdge :: KnowledgeBase.Edge -> [ String ]
 toPrologFileEdge edge = let
     u = stringify $ Bitcode.locationVariable (KnowledgeBase.from edge)
@@ -119,8 +124,9 @@ toPrologFileCallable callable = let
     quotedAnnotation = "'" ++ annotation ++ "'"
     callable_loc = "kb_callable( " ++ locstring ++ " )."
     callable_fqn = "kb_has_fqn( " ++ locstring ++ ", " ++ (omitNewFromFqn quotedFqn) ++ " )."
+    ctor_hack = "kb_has_fqn( " ++ locstring ++ ", " ++ (replaceConstructorNameInFqn quotedFqn) ++ " )."
     callable_annotation = "kb_callable_annotated_with( " ++ locstring ++ ", " ++ quotedAnnotation ++ " )."
-    in [ callable_loc, callable_fqn, callable_annotation ]
+    in [ callable_loc, callable_fqn, callable_annotation, ctor_hack ]
 
 toPrologFileArgs :: [ KnowledgeBase.Arg ] -> [ String ]
 toPrologFileArgs args = Data.List.foldl' (++) [] (toPrologFileArgs' args)
