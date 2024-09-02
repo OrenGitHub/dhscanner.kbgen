@@ -48,7 +48,7 @@ executable kbgen
         base,
         containers,
         dhscanner-ast >= 0.1.0.3,
-        dhscanner-bitcode >= 0.1.0.1,
+        dhscanner-bitcode >= 0.1.0.2,
         aeson,
         array,
         yesod,

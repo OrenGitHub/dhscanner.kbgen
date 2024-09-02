@@ -312,8 +312,10 @@ kbGenArgs cfg = let
 kbGenVars :: Cfg -> [ Bitcode.Variable ]
 kbGenVars cfg = let
     nodes = Cfg.actualNodes $ Cfg.nodes cfg
-    instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes) 
-    in catMaybes (Data.Set.toList (Data.Set.map Bitcode.output instructions))
+    instructions = Data.Set.map (Bitcode.instructionContent . Cfg.theInstructionInside) nodes
+    variables_sets = Data.Set.map Bitcode.variables instructions
+    variables_set = Data.Set.foldl' Data.Set.union Data.Set.empty variables_sets
+    in Data.Set.toList variables_set
 
 kbGenScriptArgsFromCalls :: [ Bitcode.CallContent ] -> [ Arg ]
 kbGenScriptArgsFromCalls calls = Data.List.foldl' (++) [] (kbGenScriptArgsFromCalls' calls)
