@@ -36,7 +36,17 @@ toPrologFile kb = let
     subclasses = toPrologFileSubclasses (KnowledgeBase.subclasses kb)
     methodsof = toPrologFileMethodsof (KnowledgeBase.methodsof kb)
     methodvars = toPrologFileMethodvars (KnowledgeBase.methodvars kb)
-    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof ++ methodvars)
+    strings = toPrologFileStrings (KnowledgeBase.strings kb)
+    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof ++ methodvars ++ strings)
+
+toPrologFileStrings :: [ Token.ConstStr ] -> [ String ]
+toPrologFileStrings = Data.List.map toPrologFileString
+
+toPrologFileString :: Token.ConstStr -> String
+toPrologFileString s = let
+    loc = stringify (Token.constStrLocation s)
+    value = Token.constStrValue s
+    in "kb_const_string( " ++ loc ++ ", " ++ "'" ++ value ++ "' )."
 
 toPrologFileMethodvars :: [(Bitcode.Variable, Location)] -> [ String ]
 toPrologFileMethodvars = Data.List.map toPrologFileMethodvar

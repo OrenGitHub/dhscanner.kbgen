@@ -39,7 +39,8 @@ data KnowledgeBase
           funcs :: [ KBCallable ],
           subclasses :: [(Token.ClassName,Token.SuperName)],
           methodsof :: [(Token.MethdName, Location, Token.ClassName)],
-          methodvars :: [(Bitcode.Variable, Location)]
+          methodvars :: [(Bitcode.Variable, Location)],
+          strings :: [Token.ConstStr]
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -96,7 +97,7 @@ data Param
      deriving ( Show, Generic, ToJSON )
 
 emptyKnowledgeBase :: KnowledgeBase
-emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] [] [] []
+emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] [] [] [] []
 
 -- | API: generate a prolog knowledge base from
 -- a collection of callables
@@ -117,7 +118,8 @@ kbGen' (c:cs) = let
     subclasses' = (subclasses kb) ++ (subclasses rest)
     methodsof' = (methodsof kb) ++ (methodsof rest)
     methodvars' = (methodvars kb) ++ (methodvars rest)
-    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' methodsof' methodvars'
+    strings' = (strings kb) ++ (strings rest)
+    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' methodsof' methodvars' strings'
 
 kbGen'' :: Callable -> KnowledgeBase
 kbGen'' (Callable.Script script) = kbGenScript script
@@ -138,7 +140,8 @@ kbGenMethod method = let
     subclasses' = [(hostingClass, s) | s <- supers ]
     methodsof' = [(Callable.methodName method, Callable.methodLocation method, hostingClass)]
     methodvars' = [(v, Callable.methodLocation method) | v <- vars']
-    in KnowledgeBase calls' args' [] params' dataflow' funcs' subclasses' methodsof' methodvars'
+    strings' = kbGenStrings (Callable.methodBody method)
+    in KnowledgeBase calls' args' [] params' dataflow' funcs' subclasses' methodsof' methodvars' strings'
 
 kbGenFunction :: Callable.FunctionContent -> KnowledgeBase
 kbGenFunction func = let
@@ -148,13 +151,15 @@ kbGenFunction func = let
     dataflow' = extractFunctionDataflow func
     annotations' = Callable.funcAnnotations func
     funcs' = [ KBCallable (fqnifyFunc func) annotations' (Callable.funcLocation func) ]
-    in KnowledgeBase calls' args' [] params' dataflow' funcs' [] [] []
+    strings' = kbGenStrings (Callable.funcBody func)
+    in KnowledgeBase calls' args' [] params' dataflow' funcs' [] [] [] strings'
 
 kbGenScript :: Callable.ScriptContent -> KnowledgeBase
 kbGenScript script = let
     calls' = kbGenScriptCalls script
     args' = kbGenScriptArgs script
-    in KnowledgeBase calls' args' [] [] [] [] [] [] []
+    strings' = kbGenStrings (Callable.scriptBody script)
+    in KnowledgeBase calls' args' [] [] [] [] [] [] [] strings'
 
 kbGenLambda :: Callable.LambdaContent -> KnowledgeBase
 kbGenLambda lambda = let
@@ -163,7 +168,8 @@ kbGenLambda lambda = let
     lambdas' = [ KBLambda (Callable.lambdaLocation lambda) ]
     params' = extractLambdaParams lambda
     dataflow' = extractLambdaDataflow lambda
-    in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] [] []
+    strings' = kbGenStrings (Callable.lambdaBody lambda)
+    in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] [] [] strings'
 
 fqnifyMethod :: Callable.MethodContent -> Fqn
 fqnifyMethod method = let
@@ -266,6 +272,10 @@ keepCalls :: Bitcode.InstructionContent -> Maybe Bitcode.CallContent
 keepCalls (Bitcode.Call call) = removeNondetCalls (Bitcode.callee call) call
 keepCalls _ = Nothing
 
+keepStrings :: Bitcode.InstructionContent -> Maybe Token.ConstStr
+keepStrings (Bitcode.LoadImmStr li) = Just (Bitcode.loadImmStrValue li)
+keepStrings _ = Nothing
+
 combine :: [ Fqn ] -> [ Location ] -> [ Call ]
 combine [] _ = []
 combine _ [] = []
@@ -288,6 +298,12 @@ kbGenCallsFromMethods cfg className = let
     fqns = Data.List.map Bitcode.variableFqn callees
     locations = Data.List.map Bitcode.callLocation calls
     in combine' fqns locations className
+
+kbGenStrings :: Cfg -> [ Token.ConstStr ]
+kbGenStrings cfg = let
+    nodes = Cfg.actualNodes $ Cfg.nodes cfg
+    instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes)
+    in catMaybes (Data.Set.toList (Data.Set.map keepStrings instructions))
 
 kbGenCalls :: Cfg -> [ Call ]
 kbGenCalls cfg = let
