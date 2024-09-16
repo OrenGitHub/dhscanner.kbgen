@@ -136,12 +136,14 @@ kbGenMethod method = let
     params' = extractMethodParams method
     dataflow' = extractMethodDataflow method
     funcs' = [ KBCallable (fqnifyMethod method) [] (Callable.methodLocation method) ]
+    funcs'' = [ KBCallable (fqnifyMethod' method) [] (Callable.methodLocation method) ]
+    funcs''' = funcs' ++ funcs''
     supers = Callable.hostingClassSupers method
     subclasses' = [(hostingClass, s) | s <- supers ]
     methodsof' = [(Callable.methodName method, Callable.methodLocation method, hostingClass)]
     methodvars' = [(v, Callable.methodLocation method) | v <- vars']
     strings' = kbGenStrings (Callable.methodBody method)
-    in KnowledgeBase calls' args' [] params' dataflow' funcs' subclasses' methodsof' methodvars' strings'
+    in KnowledgeBase calls' args' [] params' dataflow' funcs''' subclasses' methodsof' methodvars' strings'
 
 kbGenFunction :: Callable.FunctionContent -> KnowledgeBase
 kbGenFunction func = let
@@ -170,6 +172,9 @@ kbGenLambda lambda = let
     dataflow' = extractLambdaDataflow lambda
     strings' = kbGenStrings (Callable.lambdaBody lambda)
     in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] [] [] strings'
+
+fqnifyMethod' :: Callable.MethodContent -> Fqn
+fqnifyMethod' = Fqn . Token.content . Token.getMethdNameToken . Callable.methodName
 
 fqnifyMethod :: Callable.MethodContent -> Fqn
 fqnifyMethod method = let
