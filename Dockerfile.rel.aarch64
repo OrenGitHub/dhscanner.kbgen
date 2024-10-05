@@ -1,4 +1,6 @@
-FROM haskell:9.4.8
-RUN wget https://github.com/OrenGitHub/dhscanner.kbgen/releases/download/v0.0.5/kbgen.aarch64
-RUN chmod +x kbgen.aarch64
-CMD ["./kbgen.aarch64"]
+FROM ubuntu
+RUN apt-get update -y
+RUN apt-get install wget -y
+RUN wget https://github.com/OrenGitHub/dhscanner/releases/download/v0.0.1/kbgen.elf.aarch64
+RUN chmod +x kbgen.elf.aarch64
+CMD ["./kbgen.elf.aarch64"]
