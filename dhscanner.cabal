@@ -58,4 +58,6 @@ executable kbgen
     hs-source-dirs:
         src
 
+    ghc-options: -Wall -threaded -Werror=missing-fields
+
     default-language: Haskell2010
