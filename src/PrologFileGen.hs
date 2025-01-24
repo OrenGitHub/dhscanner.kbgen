@@ -42,11 +42,15 @@ toPrologFile kb = let
 toPrologFileStrings :: [ Token.ConstStr ] -> [ String ]
 toPrologFileStrings = Data.List.map toPrologFileString
 
+escapeSingleQuotes :: String -> String
+escapeSingleQuotes = concatMap (\c -> if c == '\'' then "\\'" else [c])
+
 toPrologFileString :: Token.ConstStr -> String
 toPrologFileString s = let
     loc = stringify (Token.constStrLocation s)
     value = Token.constStrValue s
-    in "kb_const_string( " ++ loc ++ ", " ++ "'" ++ value ++ "' )."
+    escapedSingleQuotes = escapeSingleQuotes value
+    in "kb_const_string( " ++ loc ++ ", " ++ "'" ++ escapedSingleQuotes ++ "' )."
 
 toPrologFileMethodvars :: [(Bitcode.Variable, Location)] -> [ String ]
 toPrologFileMethodvars = Data.List.map toPrologFileMethodvar
