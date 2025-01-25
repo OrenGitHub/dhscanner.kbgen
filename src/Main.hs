@@ -29,7 +29,7 @@ mkYesod "App" [parseRoutes|
 /healthcheck HealthcheckR GET
 |]
 
-instance Yesod App where maximumContentLength = \_app -> (\_anyRouteReally -> Just 64000000)
+instance Yesod App where maximumContentLength = \_app -> (\_anyRouteReally -> Just 128000000)
 
 getHealthcheckR :: Handler Value
 getHealthcheckR = returnJson $ Healthy True
