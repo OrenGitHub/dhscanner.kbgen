@@ -95,16 +95,16 @@ toPrologFileEdge edge = let
     fqnV = "kb_has_fqn( " ++ v ++ ", " ++ "'" ++ omitNewFromFqn (Fqn.content (Bitcode.variableFqn (KnowledgeBase.to   edge))) ++ "'" ++ " )."
     in [ dataflowEdge, fqnU, fqnV ]
 
-toPrologFileSubclasses :: [(Token.ClassName, Token.SuperName)] -> [ String ]
+toPrologFileSubclasses :: [(Token.ClassName, Fqn.Fqn)] -> [ String ]
 toPrologFileSubclasses tuples = Data.List.foldl' (++) [] (toPrologFileSubclasses' tuples)
 
-toPrologFileSubclasses' :: [(Token.ClassName, Token.SuperName)] -> [[ String ]]
+toPrologFileSubclasses' :: [(Token.ClassName, Fqn.Fqn)] -> [[ String ]]
 toPrologFileSubclasses' = Data.List.map toPrologFileSubclass
 
-toPrologFileSubclass :: (Token.ClassName, Token.SuperName) -> [ String ]
+toPrologFileSubclass :: (Token.ClassName, Fqn.Fqn) -> [ String ]
 toPrologFileSubclass (c,s) = let
     c' = Token.content (Token.getClassNameToken c)
-    s' = Token.content (Token.getSuperNameToken s)
+    s' = Fqn.content s
     subclass = "kb_subclass_of( " ++ c' ++ ", " ++ s' ++ " )."
     className = "kb_class_name( " ++ c' ++ ", " ++ "'" ++ c' ++ "'" ++ " )."
     superName = "kb_class_name( " ++ s' ++ ", " ++ "'" ++ s' ++ "'" ++ " )."

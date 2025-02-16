@@ -37,7 +37,7 @@ data KnowledgeBase
           params :: [ Param ],
           dataflow :: [ Edge ],
           funcs :: [ KBCallable ],
-          subclasses :: [(Token.ClassName,Token.SuperName)],
+          subclasses :: [(Token.ClassName, Fqn)],
           methodsof :: [(Token.MethdName, Location, Token.ClassName)],
           methodvars :: [(Bitcode.Variable, Location)],
           strings :: [Token.ConstStr]
