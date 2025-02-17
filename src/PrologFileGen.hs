@@ -22,6 +22,7 @@ import Data.List
 import Data.Text ( replace, pack, unpack )
 import Data.Aeson
 import GHC.Generics
+import System.FilePath (takeBaseName)
 
 data PrologFile = PrologFile { content :: [ String ] } deriving ( Show, Generic, ToJSON )
 
@@ -104,11 +105,12 @@ toPrologFileSubclasses' = Data.List.map toPrologFileSubclass
 toPrologFileSubclass :: (Token.ClassName, Fqn.Fqn) -> [ String ]
 toPrologFileSubclass (c,s) = let
     c' = Token.content (Token.getClassNameToken c)
+    filename = takeBaseName (Location.filename (Token.location (Token.getClassNameToken c)))
     s' = Fqn.content s
-    subclass = "kb_subclass_of( " ++ c' ++ ", " ++ s' ++ " )."
+    subclass = "kb_subclass_of( " ++ c' ++ ", " ++ "'" ++ s' ++ "'" ++ " )."
     className = "kb_class_name( " ++ c' ++ ", " ++ "'" ++ c' ++ "'" ++ " )."
-    superName = "kb_class_name( " ++ s' ++ ", " ++ "'" ++ s' ++ "'" ++ " )."
-    in [ className, superName, subclass ]
+    className' = "kb_class_name( " ++ c' ++ ", " ++ "'" ++ filename ++ "." ++ c' ++ "'" ++ " )."
+    in [ className, className', subclass ]
 
 toPrologFileLambdas :: [ KnowledgeBase.KBLambda ] -> [ String ]
 toPrologFileLambdas lambdas = Data.List.foldl' (++) [] (toPrologFileLambdas' lambdas)
