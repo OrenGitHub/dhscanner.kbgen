@@ -173,6 +173,14 @@ addClassContextIfNeeded call = let
     g = \s -> "kb_has_fqn( " ++ locstring ++ ", " ++ "'" ++ s ++ "." ++ rawFqn ++ "' )."
     in case fmap (g . f) classContext of { Nothing -> []; Just oneMoreFact -> [ oneMoreFact ] }
 
+addEnclosingMethodIfRelevant :: KnowledgeBase.Call -> [ String ]
+addEnclosingMethodIfRelevant call = let
+    l = stringify (KnowledgeBase.callLocation call)
+    m = KnowledgeBase.calledFromMethodLoc call
+    in case m of
+        (Just m') -> ["kb_called_from_method( " ++ l ++ ", " ++ (stringify m') ++ " )."]
+        _ -> []
+
 toPrologFileCall :: KnowledgeBase.Call -> [ String ]
 toPrologFileCall call = let
     location = KnowledgeBase.callLocation call
@@ -180,7 +188,7 @@ toPrologFileCall call = let
     theCall = "kb_call( " ++ locstring ++ " )."
     quotedFqn = "'" ++ Fqn.content (KnowledgeBase.calleeFqn call) ++ "'"
     theFqn = "kb_has_fqn( " ++ locstring ++ ", " ++ (omitNewFromFqn quotedFqn) ++ " )."
-    in [ theCall, theFqn ] ++ (addClassContextIfNeeded call)
+    in [ theCall, theFqn ] ++ (addClassContextIfNeeded call) ++ (addEnclosingMethodIfRelevant call)
 
 toPrologFileParams :: [ KnowledgeBase.Param ] -> [ String ]
 toPrologFileParams params = Data.List.foldl' (++) [] (toPrologFileParams' params)

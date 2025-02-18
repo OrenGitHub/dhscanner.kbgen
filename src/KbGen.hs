@@ -57,6 +57,8 @@ data Call
      {
          calleeFqn :: Fqn,
          callLocation :: Location,
+         calledFromMethodName :: Maybe Token.MethdName,
+         calledFromMethodLoc :: Maybe Location,
          callFromClass :: Maybe Token.ClassName
      }
      deriving ( Show, Generic, ToJSON )
@@ -130,7 +132,10 @@ kbGen'' (Callable.Function func) = kbGenFunction func
 kbGenMethod:: Callable.MethodContent -> KnowledgeBase
 kbGenMethod method = let
     hostingClass = Callable.hostingClassName method
-    calls' = kbGenCallsFromMethods (Callable.methodBody method) hostingClass
+    body = Callable.methodBody method
+    name = Callable.methodName method
+    loc = Callable.methodLocation method
+    calls' = kbGenCallsFromMethods body name loc hostingClass
     args' = kbGenArgs (Callable.methodBody method)
     vars' = kbGenVars (Callable.methodBody method)
     params' = extractMethodParams method
@@ -284,25 +289,25 @@ keepStrings _ = Nothing
 combine :: [ Fqn ] -> [ Location ] -> [ Call ]
 combine [] _ = []
 combine _ [] = []
-combine (fqn:fqns) (loc:locs) = (Call fqn loc Nothing) : (combine fqns locs)
+combine (fqn:fqns) (loc:locs) = (Call fqn loc Nothing Nothing Nothing) : (combine fqns locs)
 
-combine' :: [ Fqn ] -> [ Location ] -> Token.ClassName -> [ Call ]
-combine' [] _ _ = []
-combine' _ [] _ = []
-combine' (fqn:fqns) (loc:locs) className = (Call fqn loc (Just className)) : (combine' fqns locs className)
+combine' :: (Maybe Token.MethdName) -> (Maybe Location) -> [ Fqn ] -> [ Location ] -> Token.ClassName -> [ Call ]
+combine' _ _ [] _ _ = []
+combine' _ _ _ [] _ = []
+combine' m l (fqn:fqns) (loc:locs) c = (Call fqn loc m l (Just c)) : (combine' m l fqns locs c)
 
 kbGenScriptCalls :: Callable.ScriptContent -> [ Call ]
 kbGenScriptCalls = kbGenCalls . Callable.scriptBody
 
-kbGenCallsFromMethods :: Cfg -> Token.ClassName -> [ Call ]
-kbGenCallsFromMethods cfg className = let
+kbGenCallsFromMethods :: Cfg -> Token.MethdName -> Location -> Token.ClassName -> [ Call ]
+kbGenCallsFromMethods cfg methodName loc className = let
     nodes = Cfg.actualNodes $ Cfg.nodes cfg
     instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes)
     calls = catMaybes (Data.Set.toList (Data.Set.map keepCalls instructions))
     callees = Data.List.map Bitcode.callee calls
     fqns = Data.List.map Bitcode.variableFqn callees
     locations = Data.List.map Bitcode.callLocation calls
-    in combine' fqns locations className
+    in combine' (Just methodName) (Just loc) fqns locations className
 
 kbGenStrings :: Cfg -> [ Token.ConstStr ]
 kbGenStrings cfg = let
