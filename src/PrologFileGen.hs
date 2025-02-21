@@ -22,6 +22,7 @@ import Data.List
 import Data.Text ( replace, pack, unpack )
 import Data.Aeson
 import GHC.Generics
+import Data.List.Split
 import System.FilePath (takeBaseName)
 
 data PrologFile = PrologFile { content :: [ String ] } deriving ( Show, Generic, ToJSON )
@@ -181,14 +182,25 @@ addEnclosingMethodIfRelevant call = let
         (Just m') -> ["kb_called_from_method( " ++ l ++ ", " ++ (stringify m') ++ " )."]
         _ -> []
 
+messageify' :: String -> (String, Int) -> String
+messageify' locstring (part, idx) = "kb_has_fqn_parts( " ++ locstring ++ ", " ++ (show idx) ++ ", '" ++ part ++ "' )."
+
+messageify :: String -> [(String, Int)] -> [ String ]
+messageify locstring parts = Data.List.map (messageify' locstring) parts
+
+fqnPartify :: String -> String -> [ String ]
+fqnPartify locstring rawFqn = let
+    parts = Data.List.Split.splitOn "." rawFqn
+    in messageify locstring (zip parts [0..])
+
 toPrologFileCall :: KnowledgeBase.Call -> [ String ]
 toPrologFileCall call = let
     location = KnowledgeBase.callLocation call
     locstring = stringify location
     theCall = "kb_call( " ++ locstring ++ " )."
-    quotedFqn = "'" ++ Fqn.content (KnowledgeBase.calleeFqn call) ++ "'"
-    theFqn = "kb_has_fqn( " ++ locstring ++ ", " ++ (omitNewFromFqn quotedFqn) ++ " )."
-    in [ theCall, theFqn ] ++ (addClassContextIfNeeded call) ++ (addEnclosingMethodIfRelevant call)
+    rawFqn = Fqn.content (KnowledgeBase.calleeFqn call)
+    fqnParts = fqnPartify locstring rawFqn
+    in [ theCall] ++ fqnParts ++ (addClassContextIfNeeded call) ++ (addEnclosingMethodIfRelevant call)
 
 toPrologFileParams :: [ KnowledgeBase.Param ] -> [ String ]
 toPrologFileParams params = Data.List.foldl' (++) [] (toPrologFileParams' params)
