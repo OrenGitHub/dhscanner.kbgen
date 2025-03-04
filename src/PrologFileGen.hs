@@ -23,7 +23,7 @@ import Data.Text ( replace, pack, unpack )
 import Data.Aeson
 import GHC.Generics
 import Data.List.Split
-import System.FilePath (takeBaseName)
+import System.FilePath ( splitPath, joinPath, takeBaseName )
 
 data PrologFile = PrologFile { content :: [ String ] } deriving ( Show, Generic, ToJSON )
 
@@ -223,6 +223,14 @@ toPrologFileParam param = let
     fact3 = "kb_callable_has_param( " ++ locstringCallable ++ ", " ++ locstringParam ++ " )."
     in [ fact1, fact2, fact3 ]
 
+normalizeChar :: Char -> String
+normalizeChar '/' = "_slash_"
+normalizeChar '.' = "_dot_"
+normalizeChar c = [c]
+
+normalize :: FilePath -> FilePath
+normalize path = concatMap normalizeChar (joinPath (drop 3 (splitPath path)))
+
 stringify :: Location -> String
 stringify location = let
     sLine = show $ Location.lineStart location
@@ -230,4 +238,4 @@ stringify location = let
     eLine = show $ Location.lineEnd location
     eCol  = show $ Location.colEnd location
     filename = Location.filename location
-    in "startloc_" ++ sLine ++ "_" ++ sCol ++ "_endloc_" ++ eLine ++ "_" ++ eCol
+    in "startloc_" ++ sLine ++ "_" ++ sCol ++ "_endloc_" ++ eLine ++ "_" ++ eCol ++ "_" ++ (normalize filename)
