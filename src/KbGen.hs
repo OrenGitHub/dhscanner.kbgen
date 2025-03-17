@@ -40,7 +40,8 @@ data KnowledgeBase
           subclasses :: [(Token.ClassName, Fqn)],
           methodsof :: [(Token.MethdName, Location, Token.ClassName)],
           methodvars :: [(Bitcode.Variable, Location)],
-          strings :: [Token.ConstStr]
+          strings :: [Token.ConstStr],
+          returns :: [(Bitcode.Variable, Location)]
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -99,7 +100,7 @@ data Param
      deriving ( Show, Generic, ToJSON )
 
 emptyKnowledgeBase :: KnowledgeBase
-emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] [] [] [] []
+emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] [] [] [] [] []
 
 -- | API: generate a prolog knowledge base from
 -- a collection of callables
@@ -121,7 +122,8 @@ kbGen' (c:cs) = let
     methodsof' = (methodsof kb) ++ (methodsof rest)
     methodvars' = (methodvars kb) ++ (methodvars rest)
     strings' = (strings kb) ++ (strings rest)
-    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' methodsof' methodvars' strings'
+    returns' = (returns kb) ++ (returns rest)
+    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' methodsof' methodvars' strings' returns'
 
 kbGen'' :: Callable -> KnowledgeBase
 kbGen'' (Callable.Script script) = kbGenScript script
@@ -148,25 +150,31 @@ kbGenMethod method = let
     methodsof' = [(Callable.methodName method, Callable.methodLocation method, hostingClass)]
     methodvars' = [(v, Callable.methodLocation method) | v <- vars']
     strings' = kbGenStrings (Callable.methodBody method)
-    in KnowledgeBase calls' args' [] params' dataflow' funcs''' subclasses' methodsof' methodvars' strings'
+    returnValues = kbGenReturns body
+    returns' = [(v, loc) | v <- returnValues ]
+    in KnowledgeBase calls' args' [] params' dataflow' funcs''' subclasses' methodsof' methodvars' strings' returns'
 
 kbGenFunction :: Callable.FunctionContent -> KnowledgeBase
 kbGenFunction func = let
     calls' = kbGenCalls (Callable.funcBody func)
     args' = kbGenArgs (Callable.funcBody func)
+    body = Callable.funcBody func
+    loc = Callable.funcLocation func
     params' = extractFunctionParams func
     dataflow' = extractFunctionDataflow func
     annotations' = Callable.funcAnnotations func
     funcs' = [ KBCallable (fqnifyFunc func) annotations' (Callable.funcLocation func) ]
     strings' = kbGenStrings (Callable.funcBody func)
-    in KnowledgeBase calls' args' [] params' dataflow' funcs' [] [] [] strings'
+    returnValues = kbGenReturns body
+    returns' = [(v, loc) | v <- returnValues ]
+    in KnowledgeBase calls' args' [] params' dataflow' funcs' [] [] [] strings' returns'
 
 kbGenScript :: Callable.ScriptContent -> KnowledgeBase
 kbGenScript script = let
     calls' = kbGenScriptCalls script
     args' = kbGenScriptArgs script
     strings' = kbGenStrings (Callable.scriptBody script)
-    in KnowledgeBase calls' args' [] [] [] [] [] [] [] strings'
+    in KnowledgeBase calls' args' [] [] [] [] [] [] [] strings' []
 
 kbGenLambda :: Callable.LambdaContent -> KnowledgeBase
 kbGenLambda lambda = let
@@ -176,7 +184,7 @@ kbGenLambda lambda = let
     params' = extractLambdaParams lambda
     dataflow' = extractLambdaDataflow lambda
     strings' = kbGenStrings (Callable.lambdaBody lambda)
-    in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] [] [] strings'
+    in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] [] [] strings' []
 
 fqnifyMethod' :: Callable.MethodContent -> Fqn
 fqnifyMethod' = Fqn . Token.content . Token.getMethdNameToken . Callable.methodName
@@ -215,6 +223,7 @@ dataflowEdges' (Bitcode.Call call)           = dataflowCallEdges call
 dataflowEdges' (Bitcode.Binop binop)         = dataflowBinopEdge binop
 dataflowEdges' (Bitcode.Assign assign)       = [ dataflowAssignEdge assign ]
 dataflowEdges' (Bitcode.FieldRead fieldRead) = [ dataflowFieldReadEdge fieldRead ]
+dataflowEdges' (Bitcode.FieldWrite fieldWrite) = [ dataflowFieldWriteEdge fieldWrite ]
 dataflowEdges' (Bitcode.SubscriptRead sbRead) = [ dataflowSubscriptReadEdge sbRead ]
 dataflowEdges' _ = []
 
@@ -244,6 +253,9 @@ dataflowSubscriptReadEdge r = Edge { from = Bitcode.subscriptReadInput r, to = B
 
 dataflowFieldReadEdge :: Bitcode.FieldReadContent -> Edge
 dataflowFieldReadEdge f = Edge { from = Bitcode.fieldReadInput f, to = Bitcode.fieldReadOutput f } 
+
+dataflowFieldWriteEdge :: Bitcode.FieldWriteContent -> Edge
+dataflowFieldWriteEdge f = Edge { from = Bitcode.fieldWriteInput f, to = Bitcode.fieldWriteOutput f } 
 
 extractLambdaParams :: Callable.LambdaContent -> [ Param ]
 extractLambdaParams lambda = extractParams (Callable.lambdaLocation lambda) (Callable.lambdaBody lambda)
@@ -286,6 +298,10 @@ keepStrings :: Bitcode.InstructionContent -> Maybe Token.ConstStr
 keepStrings (Bitcode.LoadImmStr li) = Just (Bitcode.loadImmStrValue li)
 keepStrings _ = Nothing
 
+keepReturns :: Bitcode.InstructionContent -> Maybe Bitcode.Variable
+keepReturns (Bitcode.Return (Bitcode.ReturnContent (Just v))) = Just v
+keepReturns _ = Nothing
+
 combine :: [ Fqn ] -> [ Location ] -> [ Call ]
 combine [] _ = []
 combine _ [] = []
@@ -308,6 +324,12 @@ kbGenCallsFromMethods cfg methodName loc className = let
     fqns = Data.List.map Bitcode.variableFqn callees
     locations = Data.List.map Bitcode.callLocation calls
     in combine' (Just methodName) (Just loc) fqns locations className
+
+kbGenReturns :: Cfg -> [ Bitcode.Variable ]
+kbGenReturns cfg = let
+    nodes = Cfg.actualNodes $ Cfg.nodes cfg
+    instructions = Data.Set.map Bitcode.instructionContent (Data.Set.map Cfg.theInstructionInside nodes)
+    in catMaybes (Data.Set.toList (Data.Set.map keepReturns instructions))
 
 kbGenStrings :: Cfg -> [ Token.ConstStr ]
 kbGenStrings cfg = let

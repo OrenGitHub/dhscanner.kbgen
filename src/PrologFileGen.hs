@@ -39,7 +39,17 @@ toPrologFile kb = let
     methodsof = toPrologFileMethodsof (KnowledgeBase.methodsof kb)
     methodvars = toPrologFileMethodvars (KnowledgeBase.methodvars kb)
     strings = toPrologFileStrings (KnowledgeBase.strings kb)
-    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof ++ methodvars ++ strings)
+    returns = toPrologFileReturns (KnowledgeBase.returns kb)
+    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof ++ methodvars ++ strings ++ returns)
+
+toPrologFileReturn :: (Bitcode.Variable, Location) -> String
+toPrologFileReturn (v, callable) = let
+    src = stringify (Bitcode.locationVariable v)
+    dst = stringify callable
+    in "kb_dataflow_edge( " ++ src ++ ", " ++ dst ++ " )."
+
+toPrologFileReturns :: [(Bitcode.Variable, Location)] -> [ String ]
+toPrologFileReturns = Data.List.map toPrologFileReturn
 
 toPrologFileStrings :: [ Token.ConstStr ] -> [ String ]
 toPrologFileStrings = Data.List.map toPrologFileString
