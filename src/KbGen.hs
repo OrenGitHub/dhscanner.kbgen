@@ -95,6 +95,7 @@ data Param
      {
          paramSerialIdx :: Word,
          paramName :: Token.ParamName,
+         paramNominalType :: Fqn,
          callableContext :: Location
      }
      deriving ( Show, Generic, ToJSON )
@@ -277,7 +278,11 @@ toParams :: Location -> [ Bitcode.ParamDeclContent ] -> [ Param ]
 toParams location = Data.List.map (toParam location)
 
 toParam :: Location -> Bitcode.ParamDeclContent -> Param
-toParam l (Bitcode.ParamDeclContent p) = Param (Bitcode.paramVariableSerialIdx p) (Bitcode.paramVariableToken p) l 
+toParam loc (Bitcode.ParamDeclContent p) = let
+    i = Bitcode.paramVariableSerialIdx p
+    token = Bitcode.paramVariableToken p
+    fqn = Bitcode.paramVariableFqn p
+    in Param i token fqn loc
 
 keepParamDecls :: Bitcode.InstructionContent -> Maybe Bitcode.ParamDeclContent
 keepParamDecls (Bitcode.ParamDecl paramDecl) = Just paramDecl
