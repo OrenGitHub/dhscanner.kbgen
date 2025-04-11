@@ -1,0 +1,4 @@
+FROM ubuntu
+COPY kbgen.elf.x64 .
+RUN chmod +x kbgen.elf.x64
+CMD ["./kbgen.elf.x64"]
