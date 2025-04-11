@@ -17,4 +17,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: build docker image
-      run: docker build --tag parsers --file Dockerfile .
+      run: docker build --tag kbgen --file Dockerfile .
+    - name: extract generated binary
+      run: |
+        CONTAINER_ID=$(docker create kbgen)
+        BINARY_PATH=$(docker run --rm kbgen cabal list-bin kbgen | tail -n1)
+        docker cp $CONTAINER_ID:$BINARY_PATH ./kbgen.elf.x64
+        docker rm $CONTAINER_ID
+    - name: strip binary
+      run: strip kbgen.elf.x64
+    - name: embed binary in minimal image
+      run: docker build --tag kbgen.rel --file Dockerfile.rel .
+    - name: tag release image
+      run: docker tag kbgen.rel ${{ secrets.DOCKERHUB_USERNAME }}/dhscanner-kbgen:x64
+    - name: login to DockerHub
+      run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+    - name: push image to Dockerhub
+      run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/dhscanner-kbgen:x64
