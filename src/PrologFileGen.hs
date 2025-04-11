@@ -81,7 +81,8 @@ toPrologFileMethodsof' = Data.List.map toPrologFileMethodof
 
 toPrologFileMethodof :: (Token.MethdName, Location, Token.ClassName) -> [ String ]
 toPrologFileMethodof (_, loc, c) = let
-    locBased = "kb_method_of_class( " ++ (stringify loc) ++ ", " ++ (Token.content (Token.getClassNameToken c)) ++ " )."
+    classLoc = stringify (Token.location (Token.getClassNameToken c))
+    locBased = "kb_method_of_class( " ++ (stringify loc) ++ ", " ++ classLoc ++ " )."
     in [ locBased ]
 
 toPrologFileDataflow :: [ KnowledgeBase.Edge ] -> [ String ]
@@ -115,12 +116,13 @@ toPrologFileSubclasses' = Data.List.map toPrologFileSubclass
 
 toPrologFileSubclass :: (Token.ClassName, Fqn.Fqn) -> [ String ]
 toPrologFileSubclass (c,s) = let
+    loc = stringify (Token.location (Token.getClassNameToken c))
     c' = Token.content (Token.getClassNameToken c)
     filename = takeBaseName (Location.filename (Token.location (Token.getClassNameToken c)))
     s' = Fqn.content s
-    subclass = "kb_subclass_of( " ++ c' ++ ", " ++ "'" ++ s' ++ "'" ++ " )."
-    className = "kb_class_name( " ++ c' ++ ", " ++ "'" ++ c' ++ "'" ++ " )."
-    className' = "kb_class_name( " ++ c' ++ ", " ++ "'" ++ filename ++ "." ++ c' ++ "'" ++ " )."
+    subclass = "kb_subclass_of( " ++ loc ++ ", " ++ "'" ++ s' ++ "'" ++ " )."
+    className = "kb_class_name( " ++ loc ++ ", " ++ "'" ++ c' ++ "'" ++ " )."
+    className' = "kb_class_name( " ++ loc ++ ", " ++ "'" ++ filename ++ "." ++ c' ++ "'" ++ " )."
     in [ className, className', subclass ]
 
 toPrologFileLambdas :: [ KnowledgeBase.KBLambda ] -> [ String ]
