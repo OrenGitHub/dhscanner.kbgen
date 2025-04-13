@@ -8,6 +8,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
 
   build:
@@ -28,9 +31,28 @@ jobs:
       run: strip kbgen.elf.x64
     - name: embed binary in minimal image
       run: docker build --tag kbgen.rel --file Dockerfile.rel .
-    - name: tag release image
-      run: docker tag kbgen.rel ${{ secrets.DOCKERHUB_USERNAME }}/dhscanner-kbgen:x64
     - name: login to DockerHub
       run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+    - name: read and bump patch version
+      id: version
+      run: |
+        current=$(cat VERSION)
+        major=$(echo $current | cut -d. -f1)
+        minor=$(echo $current | cut -d. -f2)
+        patch=$(echo $current | cut -d. -f3)
+        new_patch=$((patch + 1))
+        new_version="$major.$minor.$new_patch"
+        echo "new_version=$new_version" >> $GITHUB_OUTPUT
+    - name: tag release image
+      run: docker tag kbgen.rel ${{ secrets.DOCKERHUB_USERNAME }}/dhscanner-kbgen:${{ steps.version.outputs.new_version }}-x64
     - name: push image to Dockerhub
-      run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/dhscanner-kbgen:x64
+      run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/dhscanner-kbgen:${{ steps.version.outputs.new_version }}-x64
+    - name: update VERSION file
+      run: echo "${{ steps.version.outputs.new_version }}" > VERSION
+    - name: commit version bump
+      run: |
+        git config user.name "github-actions"
+        git config user.email "github-actions@github.com"
+        git add VERSION
+        git commit -m ":arrow_up: Bump version: ${{ steps.version.outputs.new_version }}"
+        git push https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }} HEAD:main

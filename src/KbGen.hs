@@ -41,9 +41,19 @@ data KnowledgeBase
           methodsof :: [(Token.MethdName, Location, Token.ClassName)],
           methodvars :: [(Bitcode.Variable, Location)],
           strings :: [Token.ConstStr],
-          returns :: [(Bitcode.Variable, Location)]
+          returns :: [(Bitcode.Variable, Location)],
+          dataflow_v2 :: [ DataflowEdge ]
      }
      deriving ( Show, Generic, ToJSON )
+
+data DataflowEdge
+   = DataflowEdgeCall Edge
+   | DataflowEdgeBinop Edge
+   | DataflowEdgeAssign Edge
+   | DataflowEdgeFieldRead Edge
+   | DataflowEdgeWriteField Edge
+   | DataflowEdgeSubscriptRead Edge
+   deriving ( Show, Generic, ToJSON )
 
 data Edge
    = Edge
@@ -101,7 +111,7 @@ data Param
      deriving ( Show, Generic, ToJSON )
 
 emptyKnowledgeBase :: KnowledgeBase
-emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] [] [] [] [] []
+emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] [] [] [] [] [] []
 
 -- | API: generate a prolog knowledge base from
 -- a collection of callables
@@ -124,7 +134,7 @@ kbGen' (c:cs) = let
     methodvars' = (methodvars kb) ++ (methodvars rest)
     strings' = (strings kb) ++ (strings rest)
     returns' = (returns kb) ++ (returns rest)
-    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' methodsof' methodvars' strings' returns'
+    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' methodsof' methodvars' strings' returns' []
 
 kbGen'' :: Callable -> KnowledgeBase
 kbGen'' (Callable.Script script) = kbGenScript script
@@ -153,7 +163,7 @@ kbGenMethod method = let
     strings' = kbGenStrings (Callable.methodBody method)
     returnValues = kbGenReturns body
     returns' = [(v, loc) | v <- returnValues ]
-    in KnowledgeBase calls' args' [] params' dataflow' funcs''' subclasses' methodsof' methodvars' strings' returns'
+    in KnowledgeBase calls' args' [] params' dataflow' funcs''' subclasses' methodsof' methodvars' strings' returns' []
 
 kbGenFunction :: Callable.FunctionContent -> KnowledgeBase
 kbGenFunction func = let
@@ -168,14 +178,14 @@ kbGenFunction func = let
     strings' = kbGenStrings (Callable.funcBody func)
     returnValues = kbGenReturns body
     returns' = [(v, loc) | v <- returnValues ]
-    in KnowledgeBase calls' args' [] params' dataflow' funcs' [] [] [] strings' returns'
+    in KnowledgeBase calls' args' [] params' dataflow' funcs' [] [] [] strings' returns' []
 
 kbGenScript :: Callable.ScriptContent -> KnowledgeBase
 kbGenScript script = let
     calls' = kbGenScriptCalls script
     args' = kbGenScriptArgs script
     strings' = kbGenStrings (Callable.scriptBody script)
-    in KnowledgeBase calls' args' [] [] [] [] [] [] [] strings' []
+    in KnowledgeBase calls' args' [] [] [] [] [] [] [] strings' [] []
 
 kbGenLambda :: Callable.LambdaContent -> KnowledgeBase
 kbGenLambda lambda = let
@@ -185,7 +195,7 @@ kbGenLambda lambda = let
     params' = extractLambdaParams lambda
     dataflow' = extractLambdaDataflow lambda
     strings' = kbGenStrings (Callable.lambdaBody lambda)
-    in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] [] [] strings' []
+    in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] [] [] strings' [] []
 
 fqnifyMethod' :: Callable.MethodContent -> Fqn
 fqnifyMethod' = Fqn . Token.content . Token.getMethdNameToken . Callable.methodName
