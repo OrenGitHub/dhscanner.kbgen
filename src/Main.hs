@@ -36,8 +36,8 @@ getHealthcheckR = returnJson $ Healthy True
 
 postHomeR :: Handler Value
 postHomeR = do
-    callables <- requireCheckJsonBody :: Handler Callables
-    returnJson $ toPrologFile (kbGen callables)
+    callable <- requireCheckJsonBody :: Handler Callable
+    returnJson $ toPrologFile (kbGen callable)
 
 main :: IO ()
 main = warp 3000 App

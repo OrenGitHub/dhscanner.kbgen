@@ -113,34 +113,12 @@ data Param
 emptyKnowledgeBase :: KnowledgeBase
 emptyKnowledgeBase = KnowledgeBase [] [] [] [] [] [] [] [] [] [] [] []
 
--- | API: generate a prolog knowledge base from
--- a collection of callables
-kbGen :: Callables -> KnowledgeBase
-kbGen = kbGen' . actualCallables
-
-kbGen' :: [ Callable ] -> KnowledgeBase
-kbGen' [] = emptyKnowledgeBase
-kbGen' (c:cs) = let
-    kb = kbGen'' c
-    rest = kbGen' cs
-    calls' = (calls kb) ++ (calls rest)
-    args' = (args kb) ++ (args rest)
-    lambdas' = (lambdas kb) ++ (lambdas rest)
-    params' = (params kb) ++ (params rest)
-    dataflow' = (dataflow kb) ++ (dataflow rest)
-    funcs' = (funcs kb) ++ (funcs rest)
-    subclasses' = (subclasses kb) ++ (subclasses rest)
-    methodsof' = (methodsof kb) ++ (methodsof rest)
-    methodvars' = (methodvars kb) ++ (methodvars rest)
-    strings' = (strings kb) ++ (strings rest)
-    returns' = (returns kb) ++ (returns rest)
-    in KnowledgeBase calls' args' lambdas' params' dataflow' funcs' subclasses' methodsof' methodvars' strings' returns' []
-
-kbGen'' :: Callable -> KnowledgeBase
-kbGen'' (Callable.Script script) = kbGenScript script
-kbGen'' (Callable.Lambda lambda) = kbGenLambda lambda
-kbGen'' (Callable.Method method) = kbGenMethod method
-kbGen'' (Callable.Function func) = kbGenFunction func
+-- | API: generate a prolog knowledge base from a single callable
+kbGen :: Callable -> KnowledgeBase
+kbGen (Callable.Script script) = kbGenScript script
+kbGen (Callable.Lambda lambda) = kbGenLambda lambda
+kbGen (Callable.Method method) = kbGenMethod method
+kbGen (Callable.Function func) = kbGenFunction func
 
 kbGenMethod:: Callable.MethodContent -> KnowledgeBase
 kbGenMethod method = let

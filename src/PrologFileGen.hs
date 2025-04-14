@@ -57,12 +57,18 @@ toPrologFileStrings = Data.List.map toPrologFileString
 escapeSingleQuotes :: String -> String
 escapeSingleQuotes = concatMap (\c -> if c == '\'' then "\\'" else [c])
 
+removeBackslashes :: String -> String
+removeBackslashes = filter (/= '\\')
+
+clean :: String -> String
+clean = escapeSingleQuotes . removeBackslashes
+
 toPrologFileString :: Token.ConstStr -> String
 toPrologFileString s = let
     loc = stringify (Token.constStrLocation s)
     value = Token.constStrValue s
-    escapedSingleQuotes = escapeSingleQuotes value
-    in "kb_const_string( " ++ loc ++ ", " ++ "'" ++ escapedSingleQuotes ++ "' )."
+    cleaned = clean value
+    in "kb_const_string( " ++ loc ++ ", " ++ "'" ++ cleaned ++ "' )."
 
 toPrologFileMethodvars :: [(Bitcode.Variable, Location)] -> [ String ]
 toPrologFileMethodvars = Data.List.map toPrologFileMethodvar
