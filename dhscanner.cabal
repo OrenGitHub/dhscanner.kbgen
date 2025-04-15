@@ -48,6 +48,7 @@ executable kbgen
         base,
         containers,
         filepath,
+        regex-tdfa,
         dhscanner-ast >= 1.0.8,
         dhscanner-bitcode >= 1.0.4,
         split,
