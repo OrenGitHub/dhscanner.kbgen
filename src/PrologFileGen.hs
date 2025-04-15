@@ -16,6 +16,7 @@ import qualified KbGen as KnowledgeBase
 import qualified Location
 import qualified Bitcode
 import qualified Callable
+import qualified Data.Maybe
 
 -- general imports
 import Data.List
@@ -24,6 +25,7 @@ import Data.Aeson
 import GHC.Generics
 import Data.List.Split
 import System.FilePath ( splitPath, joinPath, takeBaseName )
+import Text.Regex.TDFA ((=~))
 
 data PrologFile = PrologFile { content :: [ String ] } deriving ( Show, Generic, ToJSON )
 
@@ -149,19 +151,47 @@ toPrologFileFuncs funcs = Data.List.foldl' (++) [] (toPrologFileFuncs' funcs)
 toPrologFileFuncs' :: [ KnowledgeBase.KBCallable ] -> [[ String ]]
 toPrologFileFuncs' = Data.List.map toPrologFileCallable
 
+callableAnnotation :: String -> String -> String
+callableAnnotation loc quoted = "kb_callable_annotated_with( " ++ loc ++ ", " ++ quoted ++ " )."
+
+routes :: String -> String -> String
+routes loc quoted = "kb_callable_annotated_with_route( " ++ loc ++ ", " ++ quoted ++ " )."
+
+extractPathVar :: String -> Maybe String
+extractPathVar input = case (input :: String) =~ ("<path:([a-zA-Z_]+)>" :: String) :: (String, String, String, [String]) of
+    (_, _, _, [group]) -> Just group
+    _  -> Nothing
+
+user_input :: String -> String -> Maybe String
+user_input loc route = case extractPathVar route of
+    Just match -> Just ("kb_callable_annotated_with_user_input_inside_route( " ++ loc ++ ", " ++ "'" ++ match ++ "'" ++ " ).")
+    _ -> Nothing
+
+user_inputs :: String -> [ String ] -> [ String ]
+user_inputs loc strings = Data.Maybe.mapMaybe (user_input loc) strings
+
+mkAnnotation :: String -> Callable.Annotation -> [ String ]
+mkAnnotation loc annotation = let
+    fqn = Callable.annotationFqn annotation
+    strings = Callable.annotationConstantStrings annotation
+    name = callableAnnotation loc ("'" ++ fqn ++ "'")
+    routes_urls = [routes loc ("'" ++ s ++ "'") | s <- strings]
+    user_input_params = user_inputs loc strings
+    in [ name ] ++ routes_urls ++ user_input_params
+
+mkAnnotations :: String -> [ Callable.Annotation ] -> [ String ]
+mkAnnotations = concatMap . mkAnnotation
+
 toPrologFileCallable :: KnowledgeBase.KBCallable -> [ String ]
 toPrologFileCallable callable = let
     quotedFqn = "'" ++ Fqn.content (KnowledgeBase.callableFqn callable) ++ "'"
     location = KnowledgeBase.callableLocation callable
     locstring = stringify location
-    annotations = KnowledgeBase.callableAnnotations callable
-    annotation = case annotations of { [] -> "moishe.zuchmir"; ((Callable.Annotation a _):_) -> a }
-    quotedAnnotation = "'" ++ annotation ++ "'"
+    annotations = mkAnnotations locstring (KnowledgeBase.callableAnnotations callable)
     callable_loc = "kb_callable( " ++ locstring ++ " )."
     callable_fqn = "kb_has_fqn( " ++ locstring ++ ", " ++ (omitNewFromFqn quotedFqn) ++ " )."
     ctor_hack = "kb_has_fqn( " ++ locstring ++ ", " ++ (replaceConstructorNameInFqn quotedFqn) ++ " )."
-    callable_annotation = "kb_callable_annotated_with( " ++ locstring ++ ", " ++ quotedAnnotation ++ " )."
-    in [ callable_loc, callable_fqn, callable_annotation, ctor_hack ]
+    in [ callable_loc, callable_fqn, ctor_hack ] ++ annotations
 
 toPrologFileArgs :: [ KnowledgeBase.Arg ] -> [ String ]
 toPrologFileArgs args = Data.List.foldl' (++) [] (toPrologFileArgs' args)
