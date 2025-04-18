@@ -159,7 +159,7 @@ routes loc quoted = "kb_callable_annotated_with_route( " ++ loc ++ ", " ++ quote
 
 extractPathVar :: String -> Maybe String
 extractPathVar input = case (input :: String) =~ ("<path:([a-zA-Z_]+)>" :: String) :: (String, String, String, [String]) of
-    (_, _, _, [group]) -> Just group
+    (_, _, _, [_group]) -> Just _group
     _  -> Nothing
 
 user_input :: String -> String -> Maybe String
@@ -276,6 +276,7 @@ toPrologFileParam param = let
 normalizeChar :: Char -> String
 normalizeChar '/' = "_slash_"
 normalizeChar '.' = "_dot_"
+normalizeChar '-' = "_dash_"
 normalizeChar c = [c]
 
 normalize :: FilePath -> FilePath
