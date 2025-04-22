@@ -214,6 +214,7 @@ dataflowEdges' (Bitcode.Assign assign)       = [ dataflowAssignEdge assign ]
 dataflowEdges' (Bitcode.FieldRead fieldRead) = [ dataflowFieldReadEdge fieldRead ]
 dataflowEdges' (Bitcode.FieldWrite fieldWrite) = [ dataflowFieldWriteEdge fieldWrite ]
 dataflowEdges' (Bitcode.SubscriptRead sbRead) = [ dataflowSubscriptReadEdge sbRead ]
+dataflowEdges' (Bitcode.SubscriptWrite sbWrite) = [ dataflowSubscriptWriteEdge sbWrite ]
 dataflowEdges' _ = []
 
 dataflowCallEdges :: Bitcode.CallContent -> [ Edge ]
@@ -236,6 +237,9 @@ dataflowBinopEdge b = let
 
 dataflowAssignEdge :: Bitcode.AssignContent -> Edge
 dataflowAssignEdge a = Edge { from = Bitcode.assignInput a, to = Bitcode.assignOutput a }
+
+dataflowSubscriptWriteEdge :: Bitcode.SubscriptWriteContent -> Edge
+dataflowSubscriptWriteEdge r = Edge { from = Bitcode.subscriptWriteInput r, to = Bitcode.subscriptWriteOutput r }
 
 dataflowSubscriptReadEdge :: Bitcode.SubscriptReadContent -> Edge
 dataflowSubscriptReadEdge r = Edge { from = Bitcode.subscriptReadInput r, to = Bitcode.subscriptReadOutput r } 
