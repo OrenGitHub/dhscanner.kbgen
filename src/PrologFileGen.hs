@@ -204,7 +204,10 @@ toPrologFileArg arg = let
     location = KnowledgeBase.argLocation arg
     locstring = stringify location
     call = stringify (KnowledgeBase.callContext arg)
-    in [ "kb_arg_for_call( " ++ locstring ++ ", " ++ call ++ " )." ]
+    arg_for_call = "kb_arg_for_call( " ++ locstring ++ ", " ++ call ++ " )."
+    i = KnowledgeBase.argSerialIdx arg
+    arg_i_for_call = "kb_arg_i_for_call( " ++ locstring ++ ", " ++ (show i) ++ ", " ++ call ++ " )."
+    in [ arg_for_call, arg_i_for_call ]
 
 toPrologFileCalls :: [ KnowledgeBase.Call ] -> [ String ]
 toPrologFileCalls calls = Data.List.foldl' (++) [] (toPrologFileCalls' calls)
