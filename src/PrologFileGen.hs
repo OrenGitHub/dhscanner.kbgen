@@ -90,8 +90,11 @@ toPrologFileMethodsof' = Data.List.map toPrologFileMethodof
 toPrologFileMethodof :: (Token.MethdName, Location, Token.ClassName) -> [ String ]
 toPrologFileMethodof (_, loc, c) = let
     classLoc = stringify (Token.location (Token.getClassNameToken c))
+    className = Token.content (Token.getClassNameToken c)
+    quotedClassName = "'" ++ className ++ "'"
     locBased = "kb_method_of_class( " ++ (stringify loc) ++ ", " ++ classLoc ++ " )."
-    in [ locBased ]
+    nameBased = "kb_method_of_class( " ++ (stringify loc) ++ ", " ++ quotedClassName ++ " )."
+    in [ locBased, nameBased ]
 
 toPrologFileDataflow :: [ KnowledgeBase.Edge ] -> [ String ]
 toPrologFileDataflow edges = Data.List.foldl' (++) [] (toPrologFileEdges edges)
