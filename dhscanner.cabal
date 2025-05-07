@@ -49,7 +49,7 @@ executable kbgen
         containers,
         filepath,
         regex-tdfa,
-        dhscanner-ast >= 1.0.8,
+        dhscanner-ast >= 1.0.9,
         dhscanner-bitcode >= 1.0.4,
         split,
         aeson,
