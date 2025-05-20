@@ -42,7 +42,18 @@ toPrologFile kb = let
     methodvars = toPrologFileMethodvars (KnowledgeBase.methodvars kb)
     strings = toPrologFileStrings (KnowledgeBase.strings kb)
     returns = toPrologFileReturns (KnowledgeBase.returns kb)
-    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof ++ methodvars ++ strings ++ returns)
+    subscripts = toPrologFileSubscripts (KnowledgeBase.subscripts kb)
+    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof ++ methodvars ++ strings ++ returns ++ subscripts)
+
+toPrologFileSubscript :: (Bitcode.Variable, Bitcode.Variable, Bitcode.Variable) -> String
+toPrologFileSubscript (out, v, subscript) = let
+    out' = stringify (Bitcode.locationVariable out)
+    v'   = stringify (Bitcode.locationVariable   v)
+    sub  = stringify (Bitcode.locationVariable subscript)
+    in "kb_read_subscript( " ++ out' ++ ", " ++ v' ++ ", " ++ sub ++ " )."
+
+toPrologFileSubscripts :: [(Bitcode.Variable, Bitcode.Variable, Bitcode.Variable)] -> [ String ]
+toPrologFileSubscripts = Data.List.map toPrologFileSubscript
 
 toPrologFileReturn :: (Bitcode.Variable, Location) -> String
 toPrologFileReturn (v, callable) = let
