@@ -20,10 +20,14 @@ import qualified Token
 import qualified Bitcode
 
 -- general imports
+import Data.Map
 import Data.Set
 import Data.List
 import Data.Maybe
 import Data.Aeson
+import Data.Sequence
+import Data.Foldable
+import Control.Monad.State.Lazy
 
 -- general imports (with hidden names)
 import GHC.Generics hiding ( from, to )
@@ -44,7 +48,7 @@ data KnowledgeBase
           returns :: [(Bitcode.Variable, Location)],
           dataflow_v2 :: [ DataflowEdge ],
           subscripts :: [(Bitcode.Variable, Bitcode.Variable, Bitcode.Variable)],
-          control_flow :: [ Edge ]
+          control_flow :: [ ControlFlowEdge ]
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -62,6 +66,14 @@ data Edge
      {
          from :: Bitcode.Variable,
          to :: Bitcode.Variable
+     }
+     deriving ( Show, Generic, ToJSON )
+
+data ControlFlowEdge
+   = ControlFlowEdge
+     {
+         start :: Bitcode.Instruction,
+         end :: Bitcode.Instruction
      }
      deriving ( Show, Generic, ToJSON )
 
@@ -144,7 +156,8 @@ kbGenMethod method = let
     returnValues = kbGenReturns body
     returns' = [(v, loc) | v <- returnValues ]
     subscripts' = extractSubscripts body
-    in KnowledgeBase calls' args' [] params' dataflow' funcs''' subclasses' methodsof' methodvars' strings' returns' [] subscripts' []
+    control_flow_edges = extractControlFlowEdges body
+    in KnowledgeBase calls' args' [] params' dataflow' funcs''' subclasses' methodsof' methodvars' strings' returns' [] subscripts' control_flow_edges
 
 kbGenFunction :: Callable.FunctionContent -> KnowledgeBase
 kbGenFunction func = let
@@ -177,6 +190,95 @@ kbGenLambda lambda = let
     dataflow' = extractLambdaDataflow lambda
     strings' = kbGenStrings (Callable.lambdaBody lambda)
     in KnowledgeBase calls' args' lambdas' params' dataflow' [] [] [] [] strings' [] [] [] []
+
+getEdges :: Cfg -> [ Cfg.Edge ]
+getEdges = Data.Set.toList . Cfg.actualEdges . Cfg.edges
+
+getPairNodes :: Cfg.Edge -> (Cfg.Node, Cfg.Node)
+getPairNodes edge = (Cfg.from edge, Cfg.to edge)
+
+getNodes :: [ Cfg.Edge ] -> [ (Cfg.Node, Cfg.Node) ]
+getNodes = Data.List.map getPairNodes
+
+getPairInstructions :: (Cfg.Node, Cfg.Node) -> (Bitcode.Instruction, Bitcode.Instruction)
+getPairInstructions (u, v) = (Cfg.theInstructionInside u, Cfg.theInstructionInside v)
+
+getInstructions :: [(Cfg.Node, Cfg.Node)] -> [(Bitcode.Instruction, Bitcode.Instruction)]
+getInstructions = Data.List.map getPairInstructions
+
+insertEdge :: (Bitcode.Instruction, Bitcode.Instruction) -> Map Bitcode.Instruction [Bitcode.Instruction] -> Map Bitcode.Instruction [Bitcode.Instruction]
+insertEdge (u,v) = Data.Map.insertWith (++) u [v]
+
+data Graph = Graph { adjacencyList :: Map Bitcode.Instruction [ Bitcode.Instruction ] }
+
+data BFSState
+   = BFSState
+     {
+         visited :: Set Bitcode.Instruction,
+         result :: Seq ControlFlowEdge,
+         graph :: Graph,
+         root :: Bitcode.Instruction
+     }
+
+type BFSContext = State BFSState
+
+pushback :: Seq a -> Seq a -> Seq a
+pushback queue newElements = queue >< newElements
+
+keepJustCalls :: Bitcode.Instruction -> Bool
+keepJustCalls (Bitcode.Instruction _ (Bitcode.Call _)) = True
+keepJustCalls _ = False
+
+removeCalls :: Bitcode.Instruction -> Bool
+removeCalls = not . keepJustCalls
+
+getSuccessors :: Graph -> Bitcode.Instruction -> [ Bitcode.Instruction ]
+getSuccessors (Graph graph) node = case Data.Map.lookup node graph of {
+    Nothing -> [];
+    Just _successors -> _successors
+}
+
+bfs'' :: Bitcode.Instruction -> Seq Bitcode.Instruction -> BFSContext ()
+bfs'' head tail = do
+    ctx <- get
+    let successors = getSuccessors (graph ctx) head
+    let calls = Data.List.filter keepJustCalls successors
+    let calls' = [ ControlFlowEdge (root ctx) c | c <- calls ]
+    let noncalls = Data.List.filter removeCalls successors
+    let visited' = Data.Set.insert head (visited ctx)
+    let result' = Data.Sequence.fromList calls' >< result ctx
+    put $ ctx { visited = visited', result = result' }
+    bfs (pushback tail (Data.Sequence.fromList noncalls))
+
+bfs' :: Bitcode.Instruction -> Seq Bitcode.Instruction -> BFSContext ()
+bfs' head tail = do { ctx <- get; case Data.Set.member head (visited ctx) of { True -> bfs tail; _ -> bfs'' head tail } }
+
+bfs :: Seq Bitcode.Instruction -> BFSContext ()
+bfs queue = case viewl queue of { EmptyL -> return (); head :< tail -> bfs' head tail }
+
+init_bfs_state :: Graph -> Bitcode.Instruction -> BFSState
+init_bfs_state g r = BFSState { visited = Data.Set.empty, result = Data.Sequence.empty, graph = g, root = r }
+
+run_bfs :: Graph -> Bitcode.Instruction -> [ ControlFlowEdge ]
+run_bfs g r =  Data.Foldable.toList (result (execState (bfs (Data.Sequence.singleton r)) (init_bfs_state g r)))
+
+mkGraph' :: [(Bitcode.Instruction, Bitcode.Instruction)] -> Graph
+mkGraph' = Graph . Data.List.foldr insertEdge Data.Map.empty
+
+mkGraph :: Cfg -> Graph
+mkGraph = mkGraph' . getInstructions . getNodes . getEdges
+
+run_bfs_from_all_calls :: Graph -> [ Bitcode.Instruction ] -> [ ControlFlowEdge ]
+run_bfs_from_all_calls graph calls = concatMap (run_bfs graph) calls
+
+extractControlFlowEdges :: Cfg -> [ ControlFlowEdge ]
+extractControlFlowEdges cfg = let
+    graph = mkGraph cfg
+    nodes = Cfg.actualNodes $ Cfg.nodes cfg
+    instructions = Data.Set.toList $ Data.Set.map Cfg.theInstructionInside nodes
+    calls = Data.List.filter keepJustCalls instructions
+    entrypoint = Cfg.theInstructionInside (Cfg.entry cfg)
+    in run_bfs_from_all_calls graph (entrypoint:calls)
 
 extractSubscripts :: Cfg -> [ (Bitcode.Variable,Bitcode.Variable,Bitcode.Variable) ]
 extractSubscripts cfg = let

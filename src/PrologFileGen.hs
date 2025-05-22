@@ -43,7 +43,8 @@ toPrologFile kb = let
     strings = toPrologFileStrings (KnowledgeBase.strings kb)
     returns = toPrologFileReturns (KnowledgeBase.returns kb)
     subscripts = toPrologFileSubscripts (KnowledgeBase.subscripts kb)
-    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof ++ methodvars ++ strings ++ returns ++ subscripts)
+    control_flow_edges = toPrologFileControlFlowEdges (KnowledgeBase.control_flow kb)
+    in PrologFile (calls ++ params ++ args ++ lambdas ++ dataflow ++ funcs ++ subclasses ++ methodsof ++ methodvars ++ strings ++ returns ++ subscripts ++ control_flow_edges)
 
 toPrologFileSubscript :: (Bitcode.Variable, Bitcode.Variable, Bitcode.Variable) -> String
 toPrologFileSubscript (out, v, subscript) = let
@@ -54,6 +55,15 @@ toPrologFileSubscript (out, v, subscript) = let
 
 toPrologFileSubscripts :: [(Bitcode.Variable, Bitcode.Variable, Bitcode.Variable)] -> [ String ]
 toPrologFileSubscripts = Data.List.map toPrologFileSubscript
+
+toPrologFileControlFlowEdge :: KnowledgeBase.ControlFlowEdge -> String
+toPrologFileControlFlowEdge (KnowledgeBase.ControlFlowEdge u v) = let
+    src = stringify (Bitcode.location u)
+    dst = stringify (Bitcode.location v)
+    in "kb_control_flow_edge( " ++ src ++ ", " ++ dst ++ " )."
+
+toPrologFileControlFlowEdges :: [ KnowledgeBase.ControlFlowEdge ] -> [ String ]
+toPrologFileControlFlowEdges = Data.List.map toPrologFileControlFlowEdge
 
 toPrologFileReturn :: (Bitcode.Variable, Location) -> String
 toPrologFileReturn (v, callable) = let
@@ -198,14 +208,16 @@ mkAnnotations = concatMap . mkAnnotation
 
 toPrologFileCallable :: KnowledgeBase.KBCallable -> [ String ]
 toPrologFileCallable callable = let
-    quotedFqn = "'" ++ Fqn.content (KnowledgeBase.callableFqn callable) ++ "'"
+    rawFqn = Fqn.content (KnowledgeBase.callableFqn callable) 
+    quotedFqn = "'" ++ rawFqn ++ "'"
     location = KnowledgeBase.callableLocation callable
     locstring = stringify location
     annotations = mkAnnotations locstring (KnowledgeBase.callableAnnotations callable)
     callable_loc = "kb_callable( " ++ locstring ++ " )."
     callable_fqn = "kb_has_fqn( " ++ locstring ++ ", " ++ (omitNewFromFqn quotedFqn) ++ " )."
     ctor_hack = "kb_has_fqn( " ++ locstring ++ ", " ++ (replaceConstructorNameInFqn quotedFqn) ++ " )."
-    in [ callable_loc, callable_fqn, ctor_hack ] ++ annotations
+    fqnParts = fqnPartify locstring rawFqn
+    in [ callable_loc, callable_fqn, ctor_hack ] ++ fqnParts ++ annotations
 
 toPrologFileArgs :: [ KnowledgeBase.Arg ] -> [ String ]
 toPrologFileArgs args = Data.List.foldl' (++) [] (toPrologFileArgs' args)
