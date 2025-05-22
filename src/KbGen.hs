@@ -320,12 +320,13 @@ dataflowEdges :: [ Bitcode.InstructionContent ] -> [[ Edge ]]
 dataflowEdges = Data.List.map dataflowEdges'
 
 dataflowEdges' :: Bitcode.InstructionContent -> [ Edge ]
-dataflowEdges' (Bitcode.Call call)           = dataflowCallEdges call
-dataflowEdges' (Bitcode.Binop binop)         = dataflowBinopEdge binop
-dataflowEdges' (Bitcode.Assign assign)       = [ dataflowAssignEdge assign ]
-dataflowEdges' (Bitcode.FieldRead fieldRead) = [ dataflowFieldReadEdge fieldRead ]
-dataflowEdges' (Bitcode.FieldWrite fieldWrite) = [ dataflowFieldWriteEdge fieldWrite ]
-dataflowEdges' (Bitcode.SubscriptRead sbRead) = [ dataflowSubscriptReadEdge sbRead ]
+dataflowEdges' (Bitcode.Call call)              = dataflowCallEdges call
+dataflowEdges' (Bitcode.Binop binop)            = dataflowBinopEdge binop
+dataflowEdges' (Bitcode.Assign assign)          = [ dataflowAssignEdge assign ]
+dataflowEdges' (Bitcode.FieldRead fieldRead)    = [ dataflowFieldReadEdge fieldRead ]
+dataflowEdges' (Bitcode.FieldWrite fieldWrite)  = [ dataflowFieldWriteEdge fieldWrite ]
+dataflowEdges' (Bitcode.UnresolvedRef unrslv)   = [ dataflowUnresolvedRefEdge unrslv ]
+dataflowEdges' (Bitcode.SubscriptRead sbRead)   = [ dataflowSubscriptReadEdge sbRead ]
 dataflowEdges' (Bitcode.SubscriptWrite sbWrite) = [ dataflowSubscriptWriteEdge sbWrite ]
 dataflowEdges' _ = []
 
@@ -349,6 +350,9 @@ dataflowBinopEdge b = let
 
 dataflowAssignEdge :: Bitcode.AssignContent -> Edge
 dataflowAssignEdge a = Edge { from = Bitcode.assignInput a, to = Bitcode.assignOutput a }
+
+dataflowUnresolvedRefEdge :: Bitcode.UnresolvedRefContent -> Edge
+dataflowUnresolvedRefEdge c = Edge { from = Bitcode.unresolvedRef c, to = Bitcode.unresolvedRefOutput c } 
 
 dataflowSubscriptWriteEdge :: Bitcode.SubscriptWriteContent -> Edge
 dataflowSubscriptWriteEdge r = Edge { from = Bitcode.subscriptWriteInput r, to = Bitcode.subscriptWriteOutput r }
