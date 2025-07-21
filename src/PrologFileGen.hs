@@ -309,7 +309,7 @@ normalizeChar '-' = "_dash_"
 normalizeChar c = [c]
 
 normalize :: FilePath -> FilePath
-normalize path = concatMap normalizeChar (joinPath (drop 3 (splitPath path)))
+normalize = concatMap normalizeChar
 
 stringify :: Location -> String
 stringify location = let
