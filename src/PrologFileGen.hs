@@ -297,8 +297,8 @@ toPrologFileParam param = let
     locstringParam = stringify locationParam
     nominalType = Fqn.content (KnowledgeBase.paramNominalType param)
     fact1 = "kb_param( " ++ locstringParam ++ " )."
-    fact2 = "kb_param_has_name(" ++ locstringParam ++ "," ++ "'" ++ name ++ "'" ++ ")."
-    fact3 = "kb_param_has_type(" ++ locstringParam ++ "," ++ "'" ++ nominalType ++ "'" ++ ")."
+    fact2 = "kb_param_has_name( " ++ locstringParam ++ ", " ++ "'" ++ name ++ "'" ++ " )."
+    fact3 = "kb_param_has_type( " ++ locstringParam ++ ", " ++ "'" ++ nominalType ++ "'" ++ " )."
     fact4 = "kb_callable_has_param( " ++ locstringCallable ++ ", " ++ locstringParam ++ " )."
     in [ fact1, fact2, fact3, fact4 ]
 
@@ -306,6 +306,10 @@ normalizeChar :: Char -> String
 normalizeChar '/' = "_slash_"
 normalizeChar '.' = "_dot_"
 normalizeChar '-' = "_dash_"
+normalizeChar '[' = "_lbracket_"
+normalizeChar ']' = "_rbracket_"
+normalizeChar '(' = "_lparen_"
+normalizeChar ')' = "_rparen_"
 normalizeChar c = [c]
 
 normalize :: FilePath -> FilePath
