@@ -254,9 +254,9 @@ addClassContextIfNeeded call = let
 addEnclosingMethodIfRelevant :: KnowledgeBase.Call -> [ String ]
 addEnclosingMethodIfRelevant call = let
     l = stringify (KnowledgeBase.callLocation call)
-    m = KnowledgeBase.calledFromMethodLoc call
+    m = KnowledgeBase.calledFrom call
     in case m of
-        (Just m') -> ["kb_called_from_method( " ++ l ++ ", " ++ (stringify m') ++ " )."]
+        (Just m') -> ["kb_called_from( " ++ l ++ ", " ++ (stringify m') ++ " )."]
         _ -> []
 
 messageify' :: String -> (String, Int) -> String
@@ -265,10 +265,16 @@ messageify' locstring (part, idx) = "kb_has_fqn_parts( " ++ locstring ++ ", " ++
 messageify :: String -> [(String, Int)] -> [ String ]
 messageify locstring parts = Data.List.map (messageify' locstring) parts
 
+lastPartFact :: String -> [String] -> [String]
+lastPartFact locstring parts = case reverse parts of {
+    (lastOne:_) -> ["kb_last_fqn_part( " ++ locstring ++ ", '" ++ lastOne ++ "' )."];
+    _ -> []
+}
+
 fqnPartify :: String -> String -> [ String ]
 fqnPartify locstring rawFqn = let
     parts = Data.List.Split.splitOn "." rawFqn
-    in messageify locstring (zip parts [0..])
+    in messageify locstring (zip parts [0..]) ++ (lastPartFact locstring parts)
 
 toPrologFileCall :: KnowledgeBase.Call -> [ String ]
 toPrologFileCall call = let
