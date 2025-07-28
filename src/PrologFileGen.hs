@@ -138,7 +138,9 @@ toPrologFileEdge edge = let
     dataflowEdge = "kb_dataflow_edge( " ++ u ++ ", " ++ v ++ " )."
     fqnU = "kb_has_fqn( " ++ u ++ ", " ++ "'" ++ omitNewFromFqn (Fqn.content (Bitcode.variableFqn (KnowledgeBase.from edge))) ++ "'" ++ " )."
     fqnV = "kb_has_fqn( " ++ v ++ ", " ++ "'" ++ omitNewFromFqn (Fqn.content (Bitcode.variableFqn (KnowledgeBase.to   edge))) ++ "'" ++ " )."
-    in [ dataflowEdge, fqnU, fqnV ]
+    fqnPartsU = fqnPartify u (Fqn.content (Bitcode.variableFqn (KnowledgeBase.from edge)))
+    fqnPartsV = fqnPartify v (Fqn.content (Bitcode.variableFqn (KnowledgeBase.from edge)))
+    in [ dataflowEdge, fqnU, fqnV ] ++ fqnPartsU ++ fqnPartsV
 
 toPrologFileSubclasses :: [(Token.ClassName, Fqn.Fqn)] -> [ String ]
 toPrologFileSubclasses tuples = Data.List.foldl' (++) [] (toPrologFileSubclasses' tuples)
