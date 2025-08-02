@@ -284,8 +284,9 @@ toPrologFileCall call = let
     locstring = stringify location
     theCall = "kb_call( " ++ locstring ++ " )."
     rawFqn = Fqn.content (KnowledgeBase.calleeFqn call)
+    theFqn = "kb_has_fqn( " ++ locstring ++ ", " ++ "'" ++ rawFqn ++ "' )."
     fqnParts = fqnPartify locstring rawFqn
-    in [ theCall] ++ fqnParts ++ (addClassContextIfNeeded call) ++ (addEnclosingMethodIfRelevant call)
+    in [ theCall, theFqn ] ++ fqnParts ++ (addClassContextIfNeeded call) ++ (addEnclosingMethodIfRelevant call)
 
 toPrologFileParams :: [ KnowledgeBase.Param ] -> [ String ]
 toPrologFileParams params = Data.List.foldl' (++) [] (toPrologFileParams' params)
