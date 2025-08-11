@@ -154,10 +154,13 @@ toPrologFileSubclass (c,s) = let
     c' = Token.content (Token.getClassNameToken c)
     filename = takeBaseName (Location.filename (Token.location (Token.getClassNameToken c)))
     s' = Fqn.content s
+    parts = Data.List.Split.splitOn "." s'
+    lastPart = Data.List.last parts
     subclass = "kb_subclass_of( " ++ loc ++ ", " ++ "'" ++ s' ++ "'" ++ " )."
+    subclass' = "kb_subclass_of( " ++ loc ++ ", " ++ "'" ++ lastPart ++ "'" ++ " )."
     className = "kb_class_name( " ++ loc ++ ", " ++ "'" ++ c' ++ "'" ++ " )."
     className' = "kb_class_name( " ++ loc ++ ", " ++ "'" ++ filename ++ "." ++ c' ++ "'" ++ " )."
-    in [ className, className', subclass ]
+    in [ className, className', subclass, subclass' ]
 
 toPrologFileLambdas :: [ KnowledgeBase.KBLambda ] -> [ String ]
 toPrologFileLambdas lambdas = Data.List.foldl' (++) [] (toPrologFileLambdas' lambdas)
