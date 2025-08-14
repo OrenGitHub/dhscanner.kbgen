@@ -1,6 +1,6 @@
 cabal-version: 3.0
 name: dhscanner
-version: 0.1.0.0
+version: 1.0.0
 
 -- A short (one-line) description of the package.
 -- synopsis:
@@ -30,13 +30,13 @@ extra-doc-files: CHANGELOG.md
 -- Extra source files to be distributed with the package, such as examples, or a tutorial module.
 -- extra-source-files:
 
-common warnings
+common ghc_options
     
     ghc-options: -Wall
 
 executable kbgen
 
-    import: warnings
+    import: ghc_options
 
     main-is: Main.hs
 
@@ -49,8 +49,8 @@ executable kbgen
         containers,
         filepath,
         regex-tdfa,
-        dhscanner-ast >= 1.0.9,
-        dhscanner-bitcode >= 1.0.5,
+        dhscanner-ast >= 1.1.0,
+        dhscanner-bitcode >= 1.0.7,
         split,
         aeson,
         array,
