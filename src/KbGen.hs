@@ -42,7 +42,7 @@ data KnowledgeBase
           dataflow :: [ Edge ],
           funcs :: [ KBCallable ],
           subclasses :: [(Token.ClassName, Fqn)],
-          methodsof :: [(Token.MethdName, Location, Token.ClassName)],
+          methodsof :: [(Token.MethodName, Location, Token.ClassName)],
           methodvars :: [(Bitcode.Variable, Location)],
           strings :: [Token.ConstStr],
           returns :: [(Bitcode.Variable, Location)],
@@ -287,11 +287,11 @@ extractSubscripts cfg = let
     in [(Bitcode.subscriptReadOutput i,Bitcode.subscriptReadInput i,Bitcode.subscriptReadIdx i) | i <- subscriptReads ]
 
 fqnifyMethod' :: Callable.MethodContent -> Fqn
-fqnifyMethod' = Fqn . Token.content . Token.getMethdNameToken . Callable.methodName
+fqnifyMethod' = Fqn . Token.content . Token.getMethodNameToken . Callable.methodName
 
 fqnifyMethod :: Callable.MethodContent -> Fqn
 fqnifyMethod method = let
-    rawMethodName = Token.content (Token.getMethdNameToken (Callable.methodName method))
+    rawMethodName = Token.content (Token.getMethodNameToken (Callable.methodName method))
     hostingClassName = Token.content (Token.getClassNameToken (Callable.hostingClassName method))
     in Fqn (hostingClassName ++ "." ++ rawMethodName)
 

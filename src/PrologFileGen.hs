@@ -102,13 +102,13 @@ toPrologFileMethodvar (v, methodloc) = let
     mstr = stringify methodloc
     in "kb_var_in_method( " ++ vstr ++ ", " ++ mstr ++ " )."
 
-toPrologFileMethodsof :: [(Token.MethdName, Location, Token.ClassName)] -> [ String ]
+toPrologFileMethodsof :: [(Token.MethodName, Location, Token.ClassName)] -> [ String ]
 toPrologFileMethodsof methods = Data.List.foldl' (++) [] (toPrologFileMethodsof' methods)
 
-toPrologFileMethodsof' :: [(Token.MethdName, Location, Token.ClassName)] -> [[ String ]]
+toPrologFileMethodsof' :: [(Token.MethodName, Location, Token.ClassName)] -> [[ String ]]
 toPrologFileMethodsof' = Data.List.map toPrologFileMethodof
 
-toPrologFileMethodof :: (Token.MethdName, Location, Token.ClassName) -> [ String ]
+toPrologFileMethodof :: (Token.MethodName, Location, Token.ClassName) -> [ String ]
 toPrologFileMethodof (_, loc, c) = let
     classLoc = stringify (Token.location (Token.getClassNameToken c))
     className = Token.content (Token.getClassNameToken c)
