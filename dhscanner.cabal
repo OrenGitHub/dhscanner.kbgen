@@ -41,16 +41,16 @@ executable kbgen
     main-is: Main.hs
 
     other-modules:
-        KbGen,
-        PrologFileGen
+        Factify
 
     build-depends:
         base,
         containers,
         filepath,
         regex-tdfa,
-        dhscanner-ast >= 1.1.0,
-        dhscanner-bitcode >= 1.0.7,
+        dhscanner-ast >= 1.1.2,
+        dhscanner-bitcode >= 1.0.10,
+        dhscanner-kbgen >= 1.0.7,
         split,
         aeson,
         array,

@@ -4,19 +4,14 @@
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 import Yesod
 import Prelude
-import Data.Aeson()
+import GHC.Generics
 
 -- project imports
+import Factify
 import Callable
-import PrologFileGen
-import KbGen ( kbGen )
-
--- general imports
-import GHC.Generics
 
 data Healthy = Healthy Bool deriving ( Generic )
 
@@ -29,7 +24,7 @@ mkYesod "App" [parseRoutes|
 /healthcheck HealthcheckR GET
 |]
 
-instance Yesod App where maximumContentLength = \_app -> (\_anyRouteReally -> Just 128000000)
+instance Yesod App
 
 getHealthcheckR :: Handler Value
 getHealthcheckR = returnJson $ Healthy True
@@ -37,7 +32,7 @@ getHealthcheckR = returnJson $ Healthy True
 postHomeR :: Handler Value
 postHomeR = do
     callable <- requireCheckJsonBody :: Handler Callable
-    returnJson $ toPrologFile (kbGen callable)
+    returnJson $ factify callable
 
 main :: IO ()
 main = warp 3000 App
