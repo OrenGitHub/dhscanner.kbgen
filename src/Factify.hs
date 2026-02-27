@@ -12,6 +12,7 @@ import qualified Data.Foldable as Foldable
 -- project imports
 import Cfg
 import Callable
+import qualified Fqn
 import qualified Token
 import qualified Kbgen
 import qualified Bitcode
@@ -172,8 +173,19 @@ getCallsRelatedFacts'' call = List.foldl' Set.union Set.empty (getCallsRelatedFa
 getCallsRelatedFacts''' :: Bitcode.CallContent -> [ Set Kbgen.Fact ]
 getCallsRelatedFacts''' call = [
         getArgiForCallFacts call,
-        getKeywordArgsForCallFacts call
+        getKeywordArgsForCallFacts call,
+        getResolvedCallFacts call
     ]
+
+getResolvedCallFacts'' :: Kbgen.Call -> Kbgen.MethodName -> Kbgen.Class -> Set Kbgen.Fact
+getResolvedCallFacts'' call method c = Set.singleton (Kbgen.CallMethodOfClassCtor (Kbgen.CallMethodOfClass call method c))
+
+getResolvedCallFacts' :: Fqn.Fqn -> Kbgen.Call -> Set Kbgen.Fact
+getResolvedCallFacts' (Fqn.CallMethodOfClass _ m c) call = getResolvedCallFacts'' call (Kbgen.MethodName m) (Kbgen.Class (Token.getClassNameLocation c))
+getResolvedCallFacts' fqn call = Set.singleton (Kbgen.CallResolvedCtor (Kbgen.CallResolved call (Kbgen.Resolved fqn)))
+
+getResolvedCallFacts :: Bitcode.CallContent -> Set Kbgen.Fact
+getResolvedCallFacts c = getResolvedCallFacts' (Bitcode.variableFqn (Bitcode.callee c)) (Kbgen.Call (Bitcode.callLocation c))
 
 getKeywordArgsForCallFacts :: Bitcode.CallContent -> Set Kbgen.Fact
 getKeywordArgsForCallFacts callContent = let
