@@ -248,8 +248,7 @@ getClassRelatedFacts m = List.foldl' Set.union Set.empty (getClassRelatedFacts' 
 getClassRelatedFacts' :: Callable.MethodContent -> [ Set Kbgen.Fact ]
 getClassRelatedFacts' m = [
         methodOfClass m,
-        classNamedSuper m,
-        classResolvedSuper m
+        classResolvedSupers m
     ]
 
 methodOfClass :: Callable.MethodContent -> Set Kbgen.Fact
@@ -259,22 +258,35 @@ methodOfClass m = let
     m' = Kbgen.Method (Callable.methodLocation m)
     in Set.singleton (Kbgen.MethodOfClassCtor (Kbgen.MethodOfClass m' c))
 
-classNamedSuper :: Callable.MethodContent -> Set Kbgen.Fact
-classNamedSuper m = let
-    className = Callable.hostingClassName m
-    c = Kbgen.Class (Token.getClassNameLocation className)
-    namedSupers = List.map Callable.hostingClassSuperName (hostingClassSupers m)
-    classNamedSupers = List.map (Kbgen.ClassNamedSuper c) namedSupers
-    in Set.fromList (List.map Kbgen.ClassNamedSuperCtor classNamedSupers)
+classResolvedSupers :: Callable.MethodContent -> Set Kbgen.Fact
+classResolvedSupers m = classResolvedSupers' (Callable.hostingClassName m) (Callable.hostingClassSupers m)
 
-classResolvedSuper :: Callable.MethodContent -> Set Kbgen.Fact
-classResolvedSuper m = let
-    className = Callable.hostingClassName m
-    c = Kbgen.Class (Token.getClassNameLocation className)
-    resolvedSupers = List.map Callable.hostingClassSuperResolvedType (hostingClassSupers m)
-    nonNullResolvedSupers = List.map Kbgen.ResolvedSuper (catMaybes resolvedSupers)
-    nonNullResolvedSupers' = List.map (Kbgen.ClassResolvedSuper c) nonNullResolvedSupers
-    in Set.fromList (List.map Kbgen.ClassResolvedSuperCtor nonNullResolvedSupers')
+classResolvedSupers' :: Token.ClassName -> [ Callable.HostingClassSuper ] -> Set Kbgen.Fact
+classResolvedSupers' c = Set.fromList . classResolvedSupers'' c
+
+classResolvedSupers'' :: Token.ClassName -> [ Callable.HostingClassSuper ] -> [ Kbgen.Fact ]
+classResolvedSupers'' c = mapMaybe (classResolvedSuper c)
+
+classResolvedSuper :: Token.ClassName -> Callable.HostingClassSuper -> Maybe Kbgen.Fact
+classResolvedSuper c (Callable.HostingClassSuper superName (Just fqnSuper)) = classResolvedSuper' c superName fqnSuper
+classResolvedSuper _ _ = Nothing
+
+classResolvedSuper' :: Token.ClassName -> Token.SuperName -> Fqn.Fqn -> Maybe Kbgen.Fact
+classResolvedSuper' c s (Fqn.FirstPartyImport (Fqn.FirstPartyImportContent path _)) = Just (classResolved1stPartySuper c s path)
+classResolvedSuper' c s fqn@(Fqn.ThirdPartyImport _) = Just (classResolved3rdPartySuper c s fqn)
+classResolvedSuper' _ _ _ = Nothing
+
+classResolved1stPartySuper :: Token.ClassName -> Token.SuperName -> FilePath -> Kbgen.Fact
+classResolved1stPartySuper (Token.ClassName (Token.Named _ c)) s f = classResolved1stPartySuper' (Kbgen.Class c) s (Kbgen.SuperDefinedInFile f)
+
+classResolved3rdPartySuper :: Token.ClassName -> Token.SuperName -> Fqn.Fqn -> Kbgen.Fact
+classResolved3rdPartySuper (Token.ClassName (Token.Named _ c)) s fqn = classResolved3rdPartySuper' (Kbgen.Class c) s (Kbgen.SuperQualifiedName fqn)
+
+classResolved1stPartySuper' :: Kbgen.Class -> Token.SuperName -> Kbgen.SuperDefinedInFile -> Kbgen.Fact
+classResolved1stPartySuper' c s f = Kbgen.ClassHas1stPartySuperCtor (Kbgen.ClassHas1stPartySuper c s f)
+
+classResolved3rdPartySuper' :: Kbgen.Class -> Token.SuperName -> Kbgen.SuperQualifiedName -> Kbgen.Fact
+classResolved3rdPartySuper' c s fqn = Kbgen.ClassHas3rdPartySuperCtor (Kbgen.ClassHas3rdPartySuper c s fqn)
 
 collectParamInstruction' ::  Bitcode.Instruction -> Set Bitcode.CallContent -> Set Bitcode.CallContent
 collectParamInstruction' (Bitcode.Instruction _ (Bitcode.Call c)) = Set.insert c
