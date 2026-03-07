@@ -16,6 +16,7 @@ import qualified Fqn
 import qualified Token
 import qualified Kbgen
 import qualified Bitcode
+import qualified Location
 
 factify :: Callable -> Set Kbgen.Fact
 factify (Method m) = factifyMethod m
@@ -247,9 +248,18 @@ getClassRelatedFacts m = List.foldl' Set.union Set.empty (getClassRelatedFacts' 
 
 getClassRelatedFacts' :: Callable.MethodContent -> [ Set Kbgen.Fact ]
 getClassRelatedFacts' m = [
+        classDef m,
         methodOfClass m,
         classResolvedSupers m
     ]
+
+classDef :: Callable.MethodContent -> Set Kbgen.Fact
+classDef m = let
+    name = Callable.hostingClassName m
+    loc = Token.getClassNameLocation name
+    c = Kbgen.Class loc
+    f = Kbgen.ClassDefinedInFile (Location.filename loc)
+    in Set.singleton (Kbgen.ClassDefCtor (Kbgen.ClassDef c name f))
 
 methodOfClass :: Callable.MethodContent -> Set Kbgen.Fact
 methodOfClass m = let
