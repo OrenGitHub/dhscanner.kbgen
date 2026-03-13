@@ -6,7 +6,7 @@ where
 import Data.Set ( Set )
 import qualified Data.Set as Set
 import qualified Data.List as List
-import Data.Maybe ( mapMaybe, catMaybes )
+import Data.Maybe ( mapMaybe )
 import qualified Data.Foldable as Foldable
 
 -- project imports
@@ -59,6 +59,7 @@ factifyMethod m = List.foldl' Set.union Set.empty (factifyMethod' m)
 factifyMethod' :: Callable.MethodContent -> [ Set Kbgen.Fact ]
 factifyMethod' m = [
         getClassRelatedFacts m,
+        getDataflowFacts (Callable.methodBody m),
         getCallsRelatedFacts (Callable.methodBody m),
         getParamsRelatedFacts (Kbgen.Callable (Callable.methodLocation m)) (Callable.methodBody m),
         getConstStringsRelatedFacts (Callable.methodBody m)
@@ -162,6 +163,91 @@ getParamiOfCallableFact (Bitcode.ParamDeclContent (Bitcode.ParamVariable _ i nam
     p = Kbgen.Param (Token.getParamNameLocation name)
     in Kbgen.ParamiOfCallableCtor (Kbgen.ParamiOfCallable p (Kbgen.ParamIndex i) c)
 
+getDataflowFacts :: Cfg -> Set Kbgen.Fact
+getDataflowFacts = getDataflowFacts' . instructions
+
+getDataflowFacts' :: Set Bitcode.Instruction -> Set Kbgen.Fact
+getDataflowFacts' = Foldable.foldMap' getDataflowFacts''
+
+getDataflowFacts'' :: Bitcode.Instruction -> Set Kbgen.Fact
+getDataflowFacts'' = Set.map Kbgen.DataflowEdgeCtor . getDataflowFacts'''
+
+getDataflowFacts''' :: Bitcode.Instruction -> Set Kbgen.DataflowEdge
+getDataflowFacts''' (Bitcode.Instruction _ i) = getDataflowFacts'''' i
+
+getDataflowFacts'''' :: Bitcode.InstructionContent -> Set Kbgen.DataflowEdge
+getDataflowFacts'''' (Bitcode.Call c) = getDataflowFactsFromCall c
+getDataflowFacts'''' (Bitcode.Binop b) = getDataflowFactsFromBinop b
+getDataflowFacts'''' (Bitcode.Assign a) = getDataflowFactsFromAssign a
+getDataflowFacts'''' (Bitcode.FieldRead r) = getDataflowFactsFromFieldRead r
+getDataflowFacts'''' (Bitcode.FieldWrite w) = getDataflowFactsFromFieldWrite w
+getDataflowFacts'''' (Bitcode.SubscriptRead r) = getDataflowFactsFromSubscriptRead r
+getDataflowFacts'''' (Bitcode.SubscriptWrite w) = getDataflowFactsFromSubscriptWrite w
+getDataflowFacts'''' _ = Set.empty
+
+getDataflowFactsFromCall :: Bitcode.CallContent -> Set Kbgen.DataflowEdge
+getDataflowFactsFromCall call = List.foldl' Set.union Set.empty (getDataflowFactsFromCall' call)
+
+getDataflowFactsFromCall' :: Bitcode.CallContent -> [ Set Kbgen.DataflowEdge ]
+getDataflowFactsFromCall' (Bitcode.CallContent output callee args _) = [
+        getDataflowFactsFromCalleeToOutput callee output,
+        getDataflowFactsFromEveryArgToOutput output args
+    ]
+
+getDataflowFactsFromCalleeToOutput :: Bitcode.Variable -> Bitcode.Variable -> Set Kbgen.DataflowEdge
+getDataflowFactsFromCalleeToOutput callee output = let
+    u = Kbgen.From (Bitcode.locationVariable callee)
+    v = Kbgen.To (Bitcode.locationVariable output)
+    in Set.singleton (Kbgen.DataflowEdge u v)
+
+getDataflowFactsFromEveryArgToOutput :: Bitcode.Variable -> [ Bitcode.Value ] -> Set Kbgen.DataflowEdge
+getDataflowFactsFromEveryArgToOutput output = Set.fromList . (getDataflowFactsFromEveryArgToOutput' output)
+
+getDataflowFactsFromEveryArgToOutput' :: Bitcode.Variable -> [ Bitcode.Value ] -> [ Kbgen.DataflowEdge ]
+getDataflowFactsFromEveryArgToOutput' output = List.map (getDataflowFactsFromEveryArgToOutput'' output)
+
+getDataflowFactsFromEveryArgToOutput'' :: Bitcode.Variable -> Bitcode.Value -> Kbgen.DataflowEdge
+getDataflowFactsFromEveryArgToOutput'' output arg = let
+    u = Kbgen.From (Bitcode.locationValue arg)
+    v = Kbgen.To (Bitcode.locationVariable output)
+    in Kbgen.DataflowEdge u v
+
+getDataflowFactsFromBinop :: Bitcode.BinopContent -> Set Kbgen.DataflowEdge
+getDataflowFactsFromBinop (Bitcode.BinopContent o lhs rhs) = Set.fromList [
+        Kbgen.DataflowEdge (Kbgen.From (Bitcode.locationValue lhs)) (Kbgen.To (Bitcode.locationVariable o)),
+        Kbgen.DataflowEdge (Kbgen.From (Bitcode.locationValue rhs)) (Kbgen.To (Bitcode.locationVariable o))
+    ]
+
+getDataflowFactsFromAssign :: Bitcode.AssignContent -> Set Kbgen.DataflowEdge
+getDataflowFactsFromAssign (Bitcode.AssignContent output input) = let
+    u = Kbgen.From (Bitcode.locationValue input)
+    v = Kbgen.To (Bitcode.locationVariable output)
+    in Set.singleton (Kbgen.DataflowEdge u v)
+
+getDataflowFactsFromFieldRead :: Bitcode.FieldReadContent -> Set Kbgen.DataflowEdge
+getDataflowFactsFromFieldRead (Bitcode.FieldReadContent output input _) = let
+    u = Kbgen.From (Bitcode.locationVariable input)
+    v = Kbgen.To (Bitcode.locationVariable output)
+    in Set.singleton (Kbgen.DataflowEdge u v)
+
+getDataflowFactsFromFieldWrite :: Bitcode.FieldWriteContent -> Set Kbgen.DataflowEdge
+getDataflowFactsFromFieldWrite (Bitcode.FieldWriteContent output _ input) = let
+    u = Kbgen.From (Bitcode.locationValue input)
+    v = Kbgen.To (Bitcode.locationVariable output)
+    in Set.singleton (Kbgen.DataflowEdge u v)
+
+getDataflowFactsFromSubscriptRead :: Bitcode.SubscriptReadContent -> Set Kbgen.DataflowEdge
+getDataflowFactsFromSubscriptRead (Bitcode.SubscriptReadContent output input _) = let
+    u = Kbgen.From (Bitcode.locationVariable input)
+    v = Kbgen.To (Bitcode.locationVariable output)
+    in Set.singleton (Kbgen.DataflowEdge u v)
+
+getDataflowFactsFromSubscriptWrite :: Bitcode.SubscriptWriteContent -> Set Kbgen.DataflowEdge
+getDataflowFactsFromSubscriptWrite (Bitcode.SubscriptWriteContent output _ input) = let
+    u = Kbgen.From (Bitcode.locationValue input)
+    v = Kbgen.To (Bitcode.locationVariable output)
+    in Set.singleton (Kbgen.DataflowEdge u v)
+
 getCallsRelatedFacts :: Cfg -> Set Kbgen.Fact
 getCallsRelatedFacts = getCallsRelatedFacts' . justCalls . instructions
 
@@ -215,7 +301,7 @@ keepOnlyKeywrodArgs' _ = Nothing
 
 getArgiForCallFacts :: Bitcode.CallContent -> Set Kbgen.Fact
 getArgiForCallFacts callContent = let
-    call = Kbgen.Call (Bitcode.locationVariable (Bitcode.callee callContent))
+    call = Kbgen.Call (Bitcode.callLocation callContent)
     args = List.map (Kbgen.Arg . Bitcode.locationValue) (Bitcode.args callContent)
     argis = zip args (List.map Kbgen.ArgIndex [0..])
     in getArgiForCallFacts' call argis

@@ -5,6 +5,9 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE DeriveAnyClass    #-}
 
+{-# OPTIONS -Wno-unused-matches   #-}
+{-# OPTIONS -Wno-unused-top-binds #-}
+
 import Yesod
 import Prelude
 import GHC.Generics

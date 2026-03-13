@@ -32,7 +32,7 @@ extra-doc-files: CHANGELOG.md
 
 common ghc_options
     
-    ghc-options: -Wall
+    ghc-options: -Wall -Werror -O2
 
 executable kbgen
 
