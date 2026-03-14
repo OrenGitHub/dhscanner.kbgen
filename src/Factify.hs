@@ -38,6 +38,7 @@ factifyLambda l = List.foldl' Set.union Set.empty (factifyLambda' l)
 
 factifyLambda' :: Callable.LambdaContent -> [ Set Kbgen.Fact ]
 factifyLambda' l = [
+        getDataflowFacts (Callable.lambdaBody l),
         getCallsRelatedFacts (Callable.lambdaBody l),
         getParamsRelatedFacts (Kbgen.Callable (Callable.lambdaLocation l)) (Callable.lambdaBody l),
         getConstStringsRelatedFacts (Callable.lambdaBody l)
@@ -264,11 +265,15 @@ getCallsRelatedFacts''' call = [
         getResolvedCallFacts call
     ]
 
+getResolvedCallFacts''' :: Kbgen.Call -> Kbgen.MethodName -> Token.ParamName -> Set Kbgen.Fact
+getResolvedCallFacts''' call method p = Set.singleton (Kbgen.CallMethodOfUntypedNamedParamCtor (Kbgen.CallMethodOfUntypedNamedParam call method p))
+
 getResolvedCallFacts'' :: Kbgen.Call -> Kbgen.MethodName -> Kbgen.Class -> Set Kbgen.Fact
 getResolvedCallFacts'' call method c = Set.singleton (Kbgen.CallMethodOfClassCtor (Kbgen.CallMethodOfClass call method c))
 
 getResolvedCallFacts' :: Fqn.Fqn -> Kbgen.Call -> Set Kbgen.Fact
 getResolvedCallFacts' (Fqn.CallMethodOfClass _ m c) call = getResolvedCallFacts'' call (Kbgen.MethodName m) (Kbgen.Class (Token.getClassNameLocation c))
+getResolvedCallFacts' (Fqn.CallMethodOfUntypedNamedParam _ m p) call = getResolvedCallFacts''' call (Kbgen.MethodName m) p
 getResolvedCallFacts' fqn call = Set.singleton (Kbgen.CallResolvedCtor (Kbgen.CallResolved call (Kbgen.Resolved fqn)))
 
 getResolvedCallFacts :: Bitcode.CallContent -> Set Kbgen.Fact
