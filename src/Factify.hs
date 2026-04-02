@@ -271,9 +271,13 @@ getResolvedCallFacts''' call method p = Set.singleton (Kbgen.CallMethodOfUntyped
 getResolvedCallFacts'' :: Kbgen.Call -> Kbgen.MethodName -> Kbgen.Class -> Set Kbgen.Fact
 getResolvedCallFacts'' call method c = Set.singleton (Kbgen.CallMethodOfClassCtor (Kbgen.CallMethodOfClass call method c))
 
+getResolvedCallFacts'''' :: Kbgen.Call -> Kbgen.FuncName -> Kbgen.FuncDefinedInDir -> Set Kbgen.Fact
+getResolvedCallFacts'''' call func d = Set.singleton (Kbgen.Call1stPartyFuncDefinedInDirCtor (Kbgen.Call1stPartyFuncDefinedInDir call func d))
+
 getResolvedCallFacts' :: Fqn.Fqn -> Kbgen.Call -> Set Kbgen.Fact
 getResolvedCallFacts' (Fqn.CallMethodOfClass _ m c) call = getResolvedCallFacts'' call (Kbgen.MethodName m) (Kbgen.Class (Token.getClassNameLocation c))
 getResolvedCallFacts' (Fqn.CallMethodOfUntypedNamedParam _ m p) call = getResolvedCallFacts''' call (Kbgen.MethodName m) p
+getResolvedCallFacts' (Fqn.CallFuncFromImportedDir _ f d) call = getResolvedCallFacts'''' call (Kbgen.FuncName f) (Kbgen.FuncDefinedInDir d)
 getResolvedCallFacts' fqn call = Set.singleton (Kbgen.CallResolvedCtor (Kbgen.CallResolved call (Kbgen.Resolved fqn)))
 
 getResolvedCallFacts :: Bitcode.CallContent -> Set Kbgen.Fact
