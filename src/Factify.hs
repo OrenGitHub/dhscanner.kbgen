@@ -4,19 +4,20 @@ where
 
 -- general imports
 import Data.Set ( Set )
+import Data.Maybe ( mapMaybe )
 import qualified Data.Set as Set
 import qualified Data.List as List
-import Data.Maybe ( mapMaybe )
 import qualified Data.Foldable as Foldable
+import System.FilePath ( takeDirectory )
 
 -- project imports
 import Cfg
 import Callable
+import Location
 import qualified Fqn
 import qualified Token
 import qualified Kbgen
 import qualified Bitcode
-import qualified Location
 
 factify :: Callable -> Set Kbgen.Fact
 factify (Method m) = factifyMethod m
@@ -50,6 +51,8 @@ factifyFunc f = List.foldl' Set.union Set.empty (factifyFunc' f)
 factifyFunc' :: Callable.FunctionContent -> [ Set Kbgen.Fact ]
 factifyFunc' f = [
         getCallsRelatedFacts (Callable.funcBody f),
+        getDataflowFacts (Callable.funcBody f),
+        getCallableRelatedFacts (Callable.funcName f) (Callable.funcLocation f),
         getParamsRelatedFacts (Kbgen.Callable (Callable.funcLocation f)) (Callable.funcBody f),
         getConstStringsRelatedFacts (Callable.funcBody f)
     ]
@@ -65,6 +68,13 @@ factifyMethod' m = [
         getParamsRelatedFacts (Kbgen.Callable (Callable.methodLocation m)) (Callable.methodBody m),
         getConstStringsRelatedFacts (Callable.methodBody m)
     ]
+
+getCallableRelatedFacts :: Token.FuncName -> Location -> Set Kbgen.Fact
+getCallableRelatedFacts name loc = let
+    f = Location.filename loc
+    f' = Kbgen.FuncDefinedInFile f
+    d = Kbgen.FuncDefinedInDir (takeDirectory f)
+    in Set.singleton (Kbgen.FuncDefCtor (Kbgen.FuncDef (Kbgen.Func loc) name f' d))
 
 getConstStringsRelatedFacts :: Cfg -> Set Kbgen.Fact
 getConstStringsRelatedFacts = getConstStringsRelatedFacts' . instructions
