@@ -31,7 +31,8 @@ factifyScript s = List.foldl' Set.union Set.empty (factifyScript' s)
 factifyScript' :: Callable.ScriptContent -> [ Set Kbgen.Fact ]
 factifyScript' s = [
         getCallsRelatedFacts (Callable.scriptBody s),
-        getConstStringsRelatedFacts (Callable.scriptBody s)
+        getConstStringsRelatedFacts (Callable.scriptBody s),
+        getAssignmentsRelatedFacts (Callable.scriptBody s)
     ]
 
 factifyLambda :: Callable.LambdaContent -> Set Kbgen.Fact
@@ -142,6 +143,29 @@ getConstStringsFromValue' value = let
     location = Kbgen.ConstStr (Token.constStrLocation value)
     constString = Kbgen.ConstString location value
     in Set.singleton (Kbgen.ConstStringCtor constString)
+
+getAssignmentsRelatedFacts :: Cfg -> Set Kbgen.Fact
+getAssignmentsRelatedFacts = getAssignmentsRelatedFacts' . instructions
+
+getAssignmentsRelatedFacts' :: Set Bitcode.Instruction -> Set Kbgen.Fact
+getAssignmentsRelatedFacts' = Foldable.foldMap' getAssignmentRelatedFacts
+
+getAssignmentRelatedFacts :: Bitcode.Instruction -> Set Kbgen.Fact
+getAssignmentRelatedFacts (Bitcode.Instruction _ (Bitcode.Assign assign)) = getAssignmentRelatedFacts' assign
+getAssignmentRelatedFacts _ = Set.empty
+
+getAssignmentRelatedFacts' :: Bitcode.AssignContent -> Set Kbgen.Fact
+getAssignmentRelatedFacts' (Bitcode.AssignContent var value) = getAssignmentRelatedFacts'' var value
+
+getAssignmentRelatedFacts'' :: Bitcode.Variable -> Bitcode.Value -> Set Kbgen.Fact
+getAssignmentRelatedFacts'' (Bitcode.SrcVariableCtor var) value = getAssignmentRelatedFacts''' var value
+getAssignmentRelatedFacts'' _ _ = Set.empty
+
+getAssignmentRelatedFacts''' :: Bitcode.SrcVariable -> Bitcode.Value -> Set Kbgen.Fact
+getAssignmentRelatedFacts''' (Bitcode.SrcVariable _ varName) value = let
+    assignedValue = Kbgen.AssignedValue (Bitcode.locationValue value)
+    fact = Kbgen.AssignValueToToplevelVarName assignedValue varName
+    in Set.singleton (Kbgen.AssignValueToToplevelVarNameCtor fact)
 
 getParamsRelatedFacts :: Kbgen.Callable -> Cfg -> Set Kbgen.Fact
 getParamsRelatedFacts callable body = getParamsRelatedFacts' callable (justParams (instructions body))
