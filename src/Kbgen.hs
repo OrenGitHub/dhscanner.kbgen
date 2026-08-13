@@ -90,6 +90,7 @@ module Kbgen (
     MethodName(..),
     ResolvedType(..),
     CallResolved(..),
+    CalledFrom(..),
     AssignedValue(..),
     ResolvedSuper(..),
     FuncDefinedInDir(..),
@@ -770,6 +771,75 @@ data CallResolved = CallResolved
     Resolved -- ^
     deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_called_from( Call, Callable ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- Web-app request handlers routinely /extract fields/ from the incoming
+-- request \- headers, cookies, query parameters, body \- and the /name/
+-- of the field is often the security-relevant piece ( e.g. the constant
+-- string \'x-api-key\' says "this callable does API-key authentication" ).
+-- To reason about /which/ callable extracts /which/ field, you need to
+-- know that a particular call site lives inside the body of a particular
+-- callable.
+--
+-- No pre-existing fact tied a 'Call' back to its enclosing 'Callable' \-
+-- 'ParamiOfCallable' does the analogous thing for /parameters/ only.
+-- Because 'CalledFrom' exposes the 'Call' /location/ ( not just its FQN ),
+-- it composes with 'ArgiForCall' and 'ConstString' to also surface the
+-- /arguments/ passed at that specific call site.
+--
+-- Code snippet ( Typescript, Next.js \- formbricks at v3.16.0 ):
+--
+-- @
+-- export const authenticateRequest = async (request: Request) => {
+--     const apiKey = request.headers.get(\"x-api-key\");
+--     if (!apiKey) return null;
+--     const apiKeyData = await getApiKeyWithPermissions(apiKey);
+--     ...
+-- };
+-- @
+--
+-- See complete source example [here](https://github.com/formbricks/formbricks/blob/v3.16.0/apps/web/app/api/v1/auth.ts#L7-L36)
+--
+-- __Writing a predicate with this fact and others__
+--
+-- Compose 'CalledFrom' with 'ArgiForCall' and 'ConstString' to enumerate
+-- the constant-string header names each callable extracts from the
+-- incoming request:
+--
+-- @
+-- extracts_request_header_named( Callable, HeaderName ) :-
+--     kb_called_from( Call, Callable ),
+--     kb_call_resolved( Call, \'Request.headers.get\' ),
+--     kb_arg_i_for_call( HeaderConst, 0, Call ),
+--     kb_const_string( HeaderConst, HeaderName ).
+-- @
+--
+-- Applied to @authenticateRequest@ above, this yields
+-- @extracts_request_header_named( authenticateRequest, \'x-api-key\' )@ \-
+-- one of the six structural indicators for recognizing Shape-A
+-- ( identity-carrier ) request authenticators.
+--
+-- Other facts combined in this predicate:
+--
+--     * 'CallResolved'
+--     * 'ArgiForCall'
+--     * 'ConstString'
+--
+data CalledFrom = CalledFrom
+    Call -- ^
+    Callable -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
 
 -- |
 --
@@ -852,6 +922,7 @@ data Fact
    | ConstStringCtor ConstString
    | DataflowEdgeCtor DataflowEdge
    | CallResolvedCtor CallResolved
+   | CalledFromCtor CalledFrom
    | ConstBoolTrueCtor ConstBoolTrue
    | MethodOfClassCtor MethodOfClass
    | ClassAnnotationCtor ClassAnnotation
@@ -885,6 +956,7 @@ prologify (ArgiForCallCtor content) = prologifyArgiForCall content
 prologify (ConstStringCtor content) = prologify_ConstString content
 prologify (DataflowEdgeCtor content) = prologify_DataflowEdge content
 prologify (CallResolvedCtor content) = prologify_CallResolved content
+prologify (CalledFromCtor content) = prologify_CalledFrom content
 prologify (ConstBoolTrueCtor content) = prologify_ConstBoolTrue content
 prologify (MethodOfClassCtor content) = prologify_MethodOfClass content
 prologify (ClassAnnotationCtor content) = prologify_ClassAnnotation content
@@ -1044,6 +1116,12 @@ prologify_ParamiOfCallable' p i c = printf "kb_param_i_of_callable( %s, %u, %s )
 
 prologify_ParamiOfCallable :: ParamiOfCallable -> String
 prologify_ParamiOfCallable (ParamiOfCallable (Param p) (ParamIndex i) (Callable c)) = prologify_ParamiOfCallable' p i c
+
+prologify_CalledFrom' :: Location -> Location -> String
+prologify_CalledFrom' call callable = printf "kb_called_from( %s, %s )." (locationify call) (locationify callable)
+
+prologify_CalledFrom :: CalledFrom -> String
+prologify_CalledFrom (CalledFrom (Call call) (Callable callable)) = prologify_CalledFrom' call callable
 
 normalizeChar :: Char -> String
 normalizeChar '/' = "_slash_"
