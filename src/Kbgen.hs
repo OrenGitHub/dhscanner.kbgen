@@ -62,6 +62,7 @@ module Kbgen (
     ParamName(..),
     CallMethodOfClass(..),
     ConstString(..),
+    ConstInteger(..),
     MethodOfClass(..),
     ClassHas1stPartySuper(..),
     ClassHas3rdPartySuper(..),
@@ -99,6 +100,7 @@ module Kbgen (
     SuperDefinedInFile(..),
     SuperQualifiedName(..),
     ConstStr(..),
+    ConstInt(..),
     Fact(..),
     locationify,
     restoreloc
@@ -865,6 +867,57 @@ data ConstString = ConstString
 -- This is how the fact will look inside the Prolog file
 --
 -- @
+-- kb_const_int( Loc, Value ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- Any time a query needs to discriminate on the /value/ of a constant
+-- integer literal appearing in source code -- typically as an argument
+-- to a function that carries semantic information in that integer.
+-- The canonical example is the HTTP status code passed to a response
+-- constructor:
+--
+-- @
+-- return Response.json({ error: \"unauthorized\" }, { status: 401 });
+-- @
+--
+-- Recognizing this shape ( a bad status code returned early from a
+-- callable ) is used to identify authenticating functions.
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- utils_ts_response_json_with_status( Function, Code ) :-
+--     kb_call_resolved( OuterCall, \'nodejs.Response.json\' ),
+--     kb_arg_i_for_call( DictifyCall, 1, OuterCall ),
+--     kb_arg_i_for_call( KvCall, _, DictifyCall ),
+--     kb_arg_i_for_call( KeyLoc, 0, KvCall ),
+--     kb_const_string( KeyLoc, \'status\' ),
+--     kb_arg_i_for_call( ValueLoc, 1, KvCall ),
+--     kb_const_int( ValueLoc, Code ),
+--     kb_called_from( OuterCall, Function ).
+-- @
+--
+-- Other facts combined in this example predicate:
+--
+--     * 'CallResolved'
+--     * 'ArgiForCall'
+--     * 'ConstString'
+--     * 'CalledFrom'
+--
+data ConstInteger = ConstInteger
+    ConstInt -- ^
+    Token.ConstInt -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
 -- kb_dataflow_edge( From, To ).
 -- @
 --
@@ -884,6 +937,7 @@ data Func = Func Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Method = Method Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Callable = Callable Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ConstStr = ConstStr Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data ConstInt = ConstInt Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Annotation = Annotation Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data AssignedValue = AssignedValue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ConstBoolTrue = ConstBoolTrue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
@@ -920,6 +974,7 @@ data Fact
    | ParamNameCtor ParamName
    | ArgiForCallCtor ArgiForCall
    | ConstStringCtor ConstString
+   | ConstIntegerCtor ConstInteger
    | DataflowEdgeCtor DataflowEdge
    | CallResolvedCtor CallResolved
    | CalledFromCtor CalledFrom
@@ -954,6 +1009,7 @@ prologify (ClassDefCtor content) = prologify_ClassDef content
 prologify (ParamNameCtor content) = prologify_ParamName content
 prologify (ArgiForCallCtor content) = prologifyArgiForCall content
 prologify (ConstStringCtor content) = prologify_ConstString content
+prologify (ConstIntegerCtor content) = prologify_ConstInteger content
 prologify (DataflowEdgeCtor content) = prologify_DataflowEdge content
 prologify (CallResolvedCtor content) = prologify_CallResolved content
 prologify (CalledFromCtor content) = prologify_CalledFrom content
@@ -1010,6 +1066,12 @@ prologify_ConstString' l value = printf "kb_const_string( %s, \'%s\' )." (locati
 
 prologify_ConstString :: ConstString -> String
 prologify_ConstString (ConstString (ConstStr loc) (Token.ConstStr value _)) = prologify_ConstString' loc value
+
+prologify_ConstInteger' :: Location -> Int -> String
+prologify_ConstInteger' l value = printf "kb_const_int( %s, %d )." (locationify l) value
+
+prologify_ConstInteger :: ConstInteger -> String
+prologify_ConstInteger (ConstInteger (ConstInt loc) (Token.ConstInt value _)) = prologify_ConstInteger' loc value
 
 prologify_CallResolved'' :: Location -> String -> Token.ClassName -> String
 prologify_CallResolved'' call m c = printf "kb_call_method_of_class( %s, %s, %s )." (locationify call) m (locationify (Token.getClassNameLocation c))
