@@ -1,6 +1,16 @@
 module SmokeTests (runSmokeTests) where
 
-import Kbgen (restoreloc)
+import Kbgen
+    ( Cond (..)
+    , ConstNull (..)
+    , Fact (..)
+    , GatedReturn (..)
+    , ReturnedValue (..)
+    , locationify
+    , prologify
+    , restoreloc
+    )
+import Location (Location (..))
 import Test.Hspec (Spec, hspec, it, shouldBe)
 
 it' :: IO () -> String -> Spec
@@ -36,6 +46,30 @@ locationStringWithoutProperFormatExample3 = "startloc_1_2_endloc_3______4_foo_do
 testLocationStringWithoutProperFormatExample3 :: IO ()
 testLocationStringWithoutProperFormatExample3 = restoreloc locationStringWithoutProperFormatExample3 `shouldBe` Nothing
 
+sampleLoc :: Word -> Location
+sampleLoc n =
+    Location
+        { lineStart = n
+        , colStart = n
+        , lineEnd = n
+        , colEnd = n
+        , filename = "foo.c"
+        }
+
+testPrologifyConstNull :: IO ()
+testPrologifyConstNull =
+    let loc = sampleLoc 1
+        expected = "kb_const_null( " ++ locationify loc ++ " )."
+    in prologify (ConstNullCtor (ConstNull loc)) `shouldBe` expected
+
+testPrologifyGatedReturn :: IO ()
+testPrologifyGatedReturn =
+    let condLoc = sampleLoc 1
+        retLoc = sampleLoc 2
+        gr = GatedReturn (Cond condLoc) (ReturnedValue retLoc)
+        expected = "kb_gated_return( " ++ locationify condLoc ++ ", " ++ locationify retLoc ++ " )."
+    in prologify (GatedReturnCtor gr) `shouldBe` expected
+
 tests :: Spec
 tests = do
     it' testCompletelyInvalidLocationString "completelyInvalidLocationString should return Nothing"
@@ -43,6 +77,8 @@ tests = do
     it' testLocationStringWithoutProperFormatExample1 "locationStringWithoutProperFormatExample1 should return Nothing"
     it' testLocationStringWithoutProperFormatExample2 "locationStringWithoutProperFormatExample2 should return Nothing"
     it' testLocationStringWithoutProperFormatExample3 "locationStringWithoutProperFormatExample3 should return Nothing"
+    it' testPrologifyConstNull "prologify_ConstNull should render kb_const_null( <loc> )."
+    it' testPrologifyGatedReturn "prologify_GatedReturn should render kb_gated_return( <cond>, <ret> )."
 
 runSmokeTests :: IO ()
 runSmokeTests = hspec tests

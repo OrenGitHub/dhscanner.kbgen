@@ -70,6 +70,10 @@ module Kbgen (
     ArgiForCall(..),
     DataflowEdge(..),
     ConstBoolTrue(..),
+    ConstNull(..),
+    GatedReturn(..),
+    Cond(..),
+    ReturnedValue(..),
     ClassAnnotation,
     CallableAnnotation,
     ParamiOfCallable(..),
@@ -873,7 +877,7 @@ data ConstString = ConstString
 -- __When should I use this fact__
 --
 -- Any time a query needs to discriminate on the /value/ of a constant
--- integer literal appearing in source code -- typically as an argument
+-- integer literal appearing in source code, typically as an argument
 -- to a function that carries semantic information in that integer.
 -- The canonical example is the HTTP status code passed to a response
 -- constructor:
@@ -918,6 +922,78 @@ data ConstInteger = ConstInteger
 -- This is how the fact will look inside the Prolog file
 --
 -- @
+-- kb_const_null( Loc ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- Returning early from a function with a null value has many uses cases related to security.
+-- ( Python @None@ and Ruby @nil@ use this predicate as well )
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- kb_gated_return_null( Cond ) :-
+--     kb_gated_return( Cond, ReturnedValue ),
+--     kb_const_null( ReturnedValue ).
+-- @
+--
+-- Other facts combined in this example predicate:
+--
+--     * 'GatedReturn'
+--
+data ConstNull = ConstNull Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_gated_return( Cond, ReturnedValue ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- Authenticating functions reject invalid credentials with an early return
+-- from a guarded @if@. This fact pinpoints that rejection gate.
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- utils_early_return_null_on_missing_request_header_value( Callable, KeyName ) :-
+--     kb_called_from( Call, Callable ),
+--     kb_call_resolved( Call, \'nodejs.Request.headers.get\' ),
+--     kb_arg_i_for_call( KeyArg, 0, Call ),
+--     kb_const_string( KeyArg, KeyName ),
+--     utils_intra_dataflow_path( Call, Var, _ ),
+--     kb_gated_return_null( Cond ),
+--     utils_intra_dataflow_path( Var, Cond, _ ).
+--
+-- kb_gated_return_null( Cond ) :- kb_gated_return( Cond, RV ), kb_const_null( RV ).
+-- @
+--
+-- Other facts combined in this example predicate:
+--
+--     * 'ConstNull'
+--     * 'CallResolved'
+--     * 'ArgiForCall'
+--     * 'ConstString'
+--     * 'CalledFrom'
+--
+data GatedReturn = GatedReturn
+    Cond -- ^
+    ReturnedValue -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
 -- kb_dataflow_edge( From, To ).
 -- @
 --
@@ -941,6 +1017,8 @@ data ConstInt = ConstInt Location deriving ( Show, Eq, Ord, Generic, ToJSON, Fro
 data Annotation = Annotation Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data AssignedValue = AssignedValue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ConstBoolTrue = ConstBoolTrue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data Cond = Cond Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data ReturnedValue = ReturnedValue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
 data Keyword = Keyword String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Resolved = Resolved Fqn.Fqn deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
@@ -979,6 +1057,8 @@ data Fact
    | CallResolvedCtor CallResolved
    | CalledFromCtor CalledFrom
    | ConstBoolTrueCtor ConstBoolTrue
+   | ConstNullCtor ConstNull
+   | GatedReturnCtor GatedReturn
    | MethodOfClassCtor MethodOfClass
    | ClassAnnotationCtor ClassAnnotation
    | ParamiOfCallableCtor ParamiOfCallable
@@ -1014,6 +1094,8 @@ prologify (DataflowEdgeCtor content) = prologify_DataflowEdge content
 prologify (CallResolvedCtor content) = prologify_CallResolved content
 prologify (CalledFromCtor content) = prologify_CalledFrom content
 prologify (ConstBoolTrueCtor content) = prologify_ConstBoolTrue content
+prologify (ConstNullCtor content) = prologify_ConstNull content
+prologify (GatedReturnCtor content) = prologify_GatedReturn content
 prologify (MethodOfClassCtor content) = prologify_MethodOfClass content
 prologify (ClassAnnotationCtor content) = prologify_ClassAnnotation content
 prologify (ParamiOfCallableCtor content) = prologify_ParamiOfCallable content
@@ -1094,6 +1176,18 @@ prologify_ConstBoolTrue' trueValue = printf "kb_class_name( %s, \'%s\' )." (loca
 
 prologify_ConstBoolTrue :: ConstBoolTrue -> String
 prologify_ConstBoolTrue (ConstBoolTrue trueValue) = prologify_ConstBoolTrue' trueValue
+
+prologify_ConstNull' :: Location -> String
+prologify_ConstNull' l = printf "kb_const_null( %s )." (locationify l)
+
+prologify_ConstNull :: ConstNull -> String
+prologify_ConstNull (ConstNull loc) = prologify_ConstNull' loc
+
+prologify_GatedReturn' :: Location -> Location -> String
+prologify_GatedReturn' c v = printf "kb_gated_return( %s, %s )." (locationify c) (locationify v)
+
+prologify_GatedReturn :: GatedReturn -> String
+prologify_GatedReturn (GatedReturn (Cond c) (ReturnedValue v)) = prologify_GatedReturn' c v
 
 prologify_MethodOfClass' :: Location -> Location -> String
 prologify_MethodOfClass' m c = printf "kb_method_of_class( %s, %s )." (locationify m) (locationify c)
