@@ -72,6 +72,8 @@ module Kbgen (
     ConstBoolTrue(..),
     ConstNull(..),
     GatedReturn(..),
+    CallableReturnsValue(..),
+    CallableReturnsWithoutValue(..),
     Cond(..),
     ReturnedValue(..),
     ClassAnnotation,
@@ -994,6 +996,51 @@ data GatedReturn = GatedReturn
 -- This is how the fact will look inside the Prolog file
 --
 -- @
+-- kb_callable_returns_value( Callable, ReturnedValue ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- Every explicit `return exp;` inside a callable's body fires this fact
+-- once, keyed by the enclosing callable and the returned expression's
+-- location. Downstream predicates like `kb_const_null` or
+-- `kb_call_resolved` add semantic meaning to the value slot.
+--
+data CallableReturnsValue = CallableReturnsValue
+    Callable -- ^
+    ReturnedValue -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_callable_returns_without_value( Callable, ReturnStmtLocation ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- User-written bare `return;` (no value expression) fires this fact once,
+-- keyed by the enclosing callable and the location of the return
+-- statement itself. Distinct fact from 'CallableReturnsValue' because
+-- there is no value-expression location to anchor on; the return
+-- statement location is used instead.
+--
+data CallableReturnsWithoutValue = CallableReturnsWithoutValue
+    Callable -- ^
+    Location -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
 -- kb_dataflow_edge( From, To ).
 -- @
 --
@@ -1059,6 +1106,8 @@ data Fact
    | ConstBoolTrueCtor ConstBoolTrue
    | ConstNullCtor ConstNull
    | GatedReturnCtor GatedReturn
+   | CallableReturnsValueCtor CallableReturnsValue
+   | CallableReturnsWithoutValueCtor CallableReturnsWithoutValue
    | MethodOfClassCtor MethodOfClass
    | ClassAnnotationCtor ClassAnnotation
    | ParamiOfCallableCtor ParamiOfCallable
@@ -1096,6 +1145,8 @@ prologify (CalledFromCtor content) = prologify_CalledFrom content
 prologify (ConstBoolTrueCtor content) = prologify_ConstBoolTrue content
 prologify (ConstNullCtor content) = prologify_ConstNull content
 prologify (GatedReturnCtor content) = prologify_GatedReturn content
+prologify (CallableReturnsValueCtor content) = prologify_CallableReturnsValue content
+prologify (CallableReturnsWithoutValueCtor content) = prologify_CallableReturnsWithoutValue content
 prologify (MethodOfClassCtor content) = prologify_MethodOfClass content
 prologify (ClassAnnotationCtor content) = prologify_ClassAnnotation content
 prologify (ParamiOfCallableCtor content) = prologify_ParamiOfCallable content
@@ -1188,6 +1239,18 @@ prologify_GatedReturn' c v = printf "kb_gated_return( %s, %s )." (locationify c)
 
 prologify_GatedReturn :: GatedReturn -> String
 prologify_GatedReturn (GatedReturn (Cond c) (ReturnedValue v)) = prologify_GatedReturn' c v
+
+prologify_CallableReturnsValue' :: Location -> Location -> String
+prologify_CallableReturnsValue' c v = printf "kb_callable_returns_value( %s, %s )." (locationify c) (locationify v)
+
+prologify_CallableReturnsValue :: CallableReturnsValue -> String
+prologify_CallableReturnsValue (CallableReturnsValue (Callable c) (ReturnedValue v)) = prologify_CallableReturnsValue' c v
+
+prologify_CallableReturnsWithoutValue' :: Location -> Location -> String
+prologify_CallableReturnsWithoutValue' c s = printf "kb_callable_returns_without_value( %s, %s )." (locationify c) (locationify s)
+
+prologify_CallableReturnsWithoutValue :: CallableReturnsWithoutValue -> String
+prologify_CallableReturnsWithoutValue (CallableReturnsWithoutValue (Callable c) s) = prologify_CallableReturnsWithoutValue' c s
 
 prologify_MethodOfClass' :: Location -> Location -> String
 prologify_MethodOfClass' m c = printf "kb_method_of_class( %s, %s )." (locationify m) (locationify c)
