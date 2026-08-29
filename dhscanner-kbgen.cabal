@@ -63,7 +63,7 @@ library
         containers < 0.7,
         text,
         dhscanner-ast >= 1.1.5,
-        dhscanner-bitcode >= 1.0.17
+        dhscanner-bitcode >= 1.1.0
 
     hs-source-dirs:
         src
