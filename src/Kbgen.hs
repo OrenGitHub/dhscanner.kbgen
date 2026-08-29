@@ -72,9 +72,13 @@ module Kbgen (
     ConstBoolTrue(..),
     ConstNull(..),
     GatedReturn(..),
+    Comparison(..),
     CallableReturnsValue(..),
     CallableReturnsWithoutValue(..),
     Cond(..),
+    Lhs(..),
+    Rhs(..),
+    ComparisonOp(..),
     ReturnedValue(..),
     ClassAnnotation,
     CallableAnnotation,
@@ -996,6 +1000,44 @@ data GatedReturn = GatedReturn
 -- This is how the fact will look inside the Prolog file
 --
 -- @
+-- kb_comparison( Cond, Lhs, Rhs, Op ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- Binary comparison instructions ( currently @==@ \/ @===@ mapped to
+-- the Prolog atom @eq@, and @!=@ \/ @!==@ mapped to @neq@ ) fire this
+-- fact. The @Cond@ slot is the location of the comparison\'s output
+-- variable, which makes composing with 'GatedReturn' straightforward:
+-- when the boolean condition of an @if@ that early-returns is itself a
+-- comparison, both facts share the same location in the @Cond@ slot.
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- gated_return_on_comparison( Lhs, Rhs, Op, ReturnedValue ) :-
+--     kb_gated_return( Cond, ReturnedValue ),
+--     kb_comparison( Cond, Lhs, Rhs, Op ).
+-- @
+--
+-- Other facts combined in this example predicate:
+--
+--     * 'GatedReturn'
+--
+data Comparison = Comparison
+    Cond -- ^
+    Lhs -- ^
+    Rhs -- ^
+    ComparisonOp -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
 -- kb_callable_returns_value( Callable, ReturnedValue ).
 -- @
 --
@@ -1065,6 +1107,9 @@ data Annotation = Annotation Location deriving ( Show, Eq, Ord, Generic, ToJSON,
 data AssignedValue = AssignedValue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ConstBoolTrue = ConstBoolTrue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Cond = Cond Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data Lhs = Lhs Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data Rhs = Rhs Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data ComparisonOp = ComparisonOp String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ReturnedValue = ReturnedValue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
 data Keyword = Keyword String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
@@ -1106,6 +1151,7 @@ data Fact
    | ConstBoolTrueCtor ConstBoolTrue
    | ConstNullCtor ConstNull
    | GatedReturnCtor GatedReturn
+   | ComparisonCtor Comparison
    | CallableReturnsValueCtor CallableReturnsValue
    | CallableReturnsWithoutValueCtor CallableReturnsWithoutValue
    | MethodOfClassCtor MethodOfClass
@@ -1145,6 +1191,7 @@ prologify (CalledFromCtor content) = prologify_CalledFrom content
 prologify (ConstBoolTrueCtor content) = prologify_ConstBoolTrue content
 prologify (ConstNullCtor content) = prologify_ConstNull content
 prologify (GatedReturnCtor content) = prologify_GatedReturn content
+prologify (ComparisonCtor content) = prologify_Comparison content
 prologify (CallableReturnsValueCtor content) = prologify_CallableReturnsValue content
 prologify (CallableReturnsWithoutValueCtor content) = prologify_CallableReturnsWithoutValue content
 prologify (MethodOfClassCtor content) = prologify_MethodOfClass content
@@ -1239,6 +1286,12 @@ prologify_GatedReturn' c v = printf "kb_gated_return( %s, %s )." (locationify c)
 
 prologify_GatedReturn :: GatedReturn -> String
 prologify_GatedReturn (GatedReturn (Cond c) (ReturnedValue v)) = prologify_GatedReturn' c v
+
+prologify_Comparison' :: Location -> Location -> Location -> String -> String
+prologify_Comparison' c l r op = printf "kb_comparison( %s, %s, %s, %s )." (locationify c) (locationify l) (locationify r) op
+
+prologify_Comparison :: Comparison -> String
+prologify_Comparison (Comparison (Cond c) (Lhs l) (Rhs r) (ComparisonOp op)) = prologify_Comparison' c l r op
 
 prologify_CallableReturnsValue' :: Location -> Location -> String
 prologify_CallableReturnsValue' c v = printf "kb_callable_returns_value( %s, %s )." (locationify c) (locationify v)
