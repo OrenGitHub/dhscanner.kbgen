@@ -82,6 +82,7 @@ module Kbgen (
     ReturnedValue(..),
     ClassAnnotation,
     CallableAnnotation,
+    CallableSourceBodyLength(..),
     ParamiOfCallable(..),
     prologify,
     To(..),
@@ -653,6 +654,32 @@ data CallableAnnotation = CallableAnnotation
     deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
 -- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_callable_source_body_length( Callable, N ).
+-- @
+--
+-- Number of source-level @[ Ast.Stmt ]@ statements in the callable's body,
+-- as observed at codegen time (before any lowering to bitcode). Independent
+-- of how many bitcode instructions the body lowered to.
+--
+-- Intended for query predicates that need a source-fidelity signal ( e.g.
+-- \"this wrapper's source body is a single statement\" for HOC-unwrap ),
+-- rather than trying to reconstruct that shape from flat SSA bitcode after
+-- the fact.
+--
+-- Emitted for 'Method', 'Lambda' and 'Function' callables. Not emitted for
+-- 'Script' \-- see 'Callable.numOriginalSourceInstructions'.
+data CallableSourceBodyLength = CallableSourceBodyLength
+    Callable -- ^
+    Word -- ^ number of source-level statements in the body
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
 -- capture usage of inherited third party methods
 data MethodOfClass = MethodOfClass
     Method -- ^
@@ -1163,6 +1190,7 @@ data Fact
    | CallableAnnotationCtor CallableAnnotation
    | ClassHas1stPartySuperCtor ClassHas1stPartySuper
    | ClassHas3rdPartySuperCtor ClassHas3rdPartySuper
+   | CallableSourceBodyLengthCtor CallableSourceBodyLength
    | AssignValueToToplevelVarNameCtor AssignValueToToplevelVarName
    | Call1stPartyFuncDefinedInDirCtor Call1stPartyFuncDefinedInDir
    | Call1stPartyFuncDefinedInFileCtor Call1stPartyFuncDefinedInFile
@@ -1201,6 +1229,7 @@ prologify (ParamResolvedTypeCtor content) = prologify_ParamResolvedType content
 prologify (CallMethodOfClassCtor content) = prologify_CallMethodOfClass content
 prologify (KeywordArgForCallCtor content) = prologify_KeywordArgForCall content
 prologify (CallableAnnotationCtor content) = prologify_CallableAnnotation content
+prologify (CallableSourceBodyLengthCtor content) = prologify_CallableSourceBodyLength content
 prologify (ClassHas1stPartySuperCtor content) = prologify_ClassHas1stPartySuper content
 prologify (ClassHas3rdPartySuperCtor content) = prologify_ClassHas3rdPartySuper content
 prologify (AssignValueToToplevelVarNameCtor content) = prologify_AssignValueToToplevelVarName content
@@ -1382,6 +1411,12 @@ prologify_CallableAnnotation' c a = printf "kb_callable_has_annotation( %s, %s )
 
 prologify_CallableAnnotation :: CallableAnnotation -> String
 prologify_CallableAnnotation (CallableAnnotation (Callable c) (Annotation a)) = prologify_CallableAnnotation' c a
+
+prologify_CallableSourceBodyLength' :: Location -> Word -> String
+prologify_CallableSourceBodyLength' c n = printf "kb_callable_source_body_length( %s, %u )." (locationify c) n
+
+prologify_CallableSourceBodyLength :: CallableSourceBodyLength -> String
+prologify_CallableSourceBodyLength (CallableSourceBodyLength (Callable c) n) = prologify_CallableSourceBodyLength' c n
 
 prologify_ParamiOfCallable' :: Location -> Word -> Location -> String
 prologify_ParamiOfCallable' p i c = printf "kb_param_i_of_callable( %s, %u, %s )." (locationify p) i (locationify c)
