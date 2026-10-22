@@ -1268,11 +1268,18 @@ prologify_FuncDef' l name f d = printf "kb_func_def( %s, \'%s\', \'%s\', \'%s\' 
 prologify_FuncDef :: FuncDef -> String
 prologify_FuncDef (FuncDef (Func loc) (Token.FuncName (Token.Named name _)) (FuncDefinedInFile f) (FuncDefinedInDir d)) = prologify_FuncDef' loc name f d
 
-unquote :: String -> String
-unquote = filter (/= '\'')
+-- | contents of a single-quoted prolog atom : backslashes and quotes
+-- are escaped, so source strings like @\\[@ or @it's@ load verbatim
+quoted :: String -> String
+quoted = concatMap quoted'
+
+quoted' :: Char -> String
+quoted' '\\' = "\\\\"
+quoted' '\'' = "\\'"
+quoted' c = [c]
 
 prologify_ConstString' :: Location -> String -> String
-prologify_ConstString' l value = printf "kb_const_string( %s, \'%s\' )." (locationify l) (unquote value)
+prologify_ConstString' l value = printf "kb_const_string( %s, \'%s\' )." (locationify l) (quoted value)
 
 prologify_ConstString :: ConstString -> String
 prologify_ConstString (ConstString (ConstStr loc) (Token.ConstStr value _)) = prologify_ConstString' loc value
@@ -1402,7 +1409,7 @@ prologify_ClassAnnotation :: ClassAnnotation -> String
 prologify_ClassAnnotation (ClassAnnotation (Class c) (Annotation a)) = prologify_ClassAnnotation' c a
 
 prologify_KeywordArgForCall' ::  String -> Location -> Location -> String
-prologify_KeywordArgForCall' kw a c = printf "kb_keyword_arg_for_call( %s, %s, %s )." (locationify a) kw (locationify c)
+prologify_KeywordArgForCall' kw a c = printf "kb_keyword_arg_for_call( \'%s\', %s, %s )." (quoted kw) (locationify a) (locationify c)
 
 prologify_KeywordArgForCall :: KeywordArgForCall -> String
 prologify_KeywordArgForCall (KeywordArgForCall (Keyword kw) (Arg a) (Call c)) = prologify_KeywordArgForCall' kw a c
