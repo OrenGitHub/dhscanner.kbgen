@@ -82,6 +82,7 @@ module Kbgen (
     ReturnedValue(..),
     ClassAnnotation(..),
     CallableAnnotation(..),
+    ParamAnnotation(..),
     Annotation(..),
     CallableSourceBodyLength(..),
     ParamiOfCallable(..),
@@ -658,6 +659,38 @@ data CallableAnnotation = CallableAnnotation
 --
 -- __Name__
 --
+-- @
+-- kb_param_has_annotation( Param, Annotation ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- In Spring, user input reaches a handler through annotated params :
+--
+-- @
+-- \@GetMapping( "/items" )
+-- public List\<Item\> items( \@RequestParam( name = "q" ) String q ) { ... }
+-- @
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- spring_request_param( Param ) :-
+--     kb_param_has_annotation( Param, Annotation ),
+--     kb_call_resolved( Annotation, 'org.springframework.web.bind.annotation.RequestParam' ).
+-- @
+--
+-- Like every annotation, it is lowered as a call at its own location,
+-- so its fqn and args come from 'CallResolved' and 'KeywordArgForCall'.
+data ParamAnnotation = ParamAnnotation
+    Param -- ^
+    Annotation -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
 -- This is how the fact will look inside the Prolog file
 --
 -- @
@@ -1189,6 +1222,7 @@ data Fact
    | ParamResolvedTypeCtor ParamResolvedType
    | CallMethodOfClassCtor CallMethodOfClass
    | CallableAnnotationCtor CallableAnnotation
+   | ParamAnnotationCtor ParamAnnotation
    | ClassHas1stPartySuperCtor ClassHas1stPartySuper
    | ClassHas3rdPartySuperCtor ClassHas3rdPartySuper
    | CallableSourceBodyLengthCtor CallableSourceBodyLength
@@ -1230,6 +1264,7 @@ prologify (ParamResolvedTypeCtor content) = prologify_ParamResolvedType content
 prologify (CallMethodOfClassCtor content) = prologify_CallMethodOfClass content
 prologify (KeywordArgForCallCtor content) = prologify_KeywordArgForCall content
 prologify (CallableAnnotationCtor content) = prologify_CallableAnnotation content
+prologify (ParamAnnotationCtor content) = prologify_ParamAnnotation content
 prologify (CallableSourceBodyLengthCtor content) = prologify_CallableSourceBodyLength content
 prologify (ClassHas1stPartySuperCtor content) = prologify_ClassHas1stPartySuper content
 prologify (ClassHas3rdPartySuperCtor content) = prologify_ClassHas3rdPartySuper content
@@ -1419,6 +1454,12 @@ prologify_CallableAnnotation' c a = printf "kb_callable_has_annotation( %s, %s )
 
 prologify_CallableAnnotation :: CallableAnnotation -> String
 prologify_CallableAnnotation (CallableAnnotation (Callable c) (Annotation a)) = prologify_CallableAnnotation' c a
+
+prologify_ParamAnnotation' :: Location -> Location -> String
+prologify_ParamAnnotation' p a = printf "kb_param_has_annotation( %s, %s )." (locationify p) (locationify a)
+
+prologify_ParamAnnotation :: ParamAnnotation -> String
+prologify_ParamAnnotation (ParamAnnotation (Param p) (Annotation a)) = prologify_ParamAnnotation' p a
 
 prologify_CallableSourceBodyLength' :: Location -> Word -> String
 prologify_CallableSourceBodyLength' c n = printf "kb_callable_source_body_length( %s, %u )." (locationify c) n
