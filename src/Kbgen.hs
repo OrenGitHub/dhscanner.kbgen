@@ -64,6 +64,7 @@ module Kbgen (
     ConstString(..),
     ConstInteger(..),
     MethodOfClass(..),
+    MethodHasName(..),
     ClassHas1stPartySuper(..),
     ClassHas3rdPartySuper(..),
     CallMethodOfUntypedNamedParam(..),
@@ -72,6 +73,11 @@ module Kbgen (
     ConstBoolTrue(..),
     ConstNull(..),
     GatedReturn(..),
+    TopLevelIfThenElseGadget(..),
+    CallGuardedByCondInThenPart(..),
+    CallGuardedByCondInElsePart(..),
+    ThenPart(..),
+    ElsePart(..),
     Comparison(..),
     CallableReturnsValue(..),
     CallableReturnsWithoutValue(..),
@@ -727,6 +733,45 @@ data MethodOfClass = MethodOfClass
 -- This is how the fact will look inside the Prolog file
 --
 -- @
+-- kb_method_has_name( Method, Name ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- @
+-- \@RestController
+-- public class OidcRestController {
+--     \@RequestMapping( method = RequestMethod.GET )
+--     public void oidc( ... ) { ... }
+-- }
+-- @
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- method_of_class_by_names( Method, MethodName, ClassName ) :-
+--     kb_method_has_name( Method, MethodName ),
+--     kb_method_of_class( Method, Class ),
+--     kb_class_def( Class, ClassName, _ ).
+-- @
+--
+-- Other facts combined in this example predicate:
+--
+--     * 'MethodOfClass'
+--     * 'ClassDef'
+--
+data MethodHasName = MethodHasName
+    Method -- ^
+    Token.MethodName -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
 -- kb_arg_i_for_call( Arg, Index, Call ).
 -- @
 --
@@ -1061,6 +1106,97 @@ data GatedReturn = GatedReturn
 -- This is how the fact will look inside the Prolog file
 --
 -- @
+-- kb_top_level_if_then_else_gadget( Callable, Cond, ThenPart, ElsePart ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- Every @if@ statement with a non-empty else, sitting directly in the
+-- callable\'s body ( not nested inside another @if@ ), fires this fact.
+-- The bitcode keeps no locations for the then \/ else parts, so both
+-- wrap the location of the condition, and render as
+-- @then_part_startloc_...@ \/ @else_part_startloc_...@.
+--
+-- @
+-- if (isValidRedirectUrl(redirectUrl)) {
+--     response.sendRedirect(redirectUrl);
+-- } else {
+--     response.sendError(HttpServletResponse.SC_BAD_REQUEST);
+-- }
+-- @
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- sanitized_by_error_in_else_part( Callable, Call, Cond ) :-
+--     kb_top_level_if_then_else_gadget( Callable, Cond, ThenPart, ElsePart ),
+--     kb_call_guarded_by_cond_in_then_part( Call, Cond, ThenPart ),
+--     kb_call_guarded_by_cond_in_else_part( ErrorCall, Cond, ElsePart ),
+--     kb_call_resolved( ErrorCall, \'jakarta.servlet.http.HttpServletResponse.sendError\' ).
+-- @
+--
+-- Other facts combined in this example predicate:
+--
+--     * 'CallGuardedByCondInThenPart'
+--     * 'CallGuardedByCondInElsePart'
+--     * 'CallResolved'
+--
+data TopLevelIfThenElseGadget = TopLevelIfThenElseGadget
+    Callable -- ^
+    Cond -- ^
+    ThenPart -- ^
+    ElsePart -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_call_guarded_by_cond_in_then_part( Call, Cond, ThenPart ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- Every call in the then part of a 'TopLevelIfThenElseGadget' fires
+-- this fact, including calls in @if@ statements nested inside it.
+--
+data CallGuardedByCondInThenPart = CallGuardedByCondInThenPart
+    Call -- ^
+    Cond -- ^
+    ThenPart -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_call_guarded_by_cond_in_else_part( Call, Cond, ElsePart ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- Every call in the else part of a 'TopLevelIfThenElseGadget' fires
+-- this fact, including calls in @if@ statements nested inside it.
+--
+data CallGuardedByCondInElsePart = CallGuardedByCondInElsePart
+    Call -- ^
+    Cond -- ^
+    ElsePart -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
 -- kb_comparison( Cond, Lhs, Rhs, Op ).
 -- @
 --
@@ -1172,6 +1308,8 @@ data Lhs = Lhs Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Rhs = Rhs Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ComparisonOp = ComparisonOp String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ReturnedValue = ReturnedValue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data ThenPart = ThenPart Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data ElsePart = ElsePart Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
 data Keyword = Keyword String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Resolved = Resolved Fqn.Fqn deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
@@ -1212,10 +1350,14 @@ data Fact
    | ConstBoolTrueCtor ConstBoolTrue
    | ConstNullCtor ConstNull
    | GatedReturnCtor GatedReturn
+   | TopLevelIfThenElseGadgetCtor TopLevelIfThenElseGadget
+   | CallGuardedByCondInThenPartCtor CallGuardedByCondInThenPart
+   | CallGuardedByCondInElsePartCtor CallGuardedByCondInElsePart
    | ComparisonCtor Comparison
    | CallableReturnsValueCtor CallableReturnsValue
    | CallableReturnsWithoutValueCtor CallableReturnsWithoutValue
    | MethodOfClassCtor MethodOfClass
+   | MethodHasNameCtor MethodHasName
    | ClassAnnotationCtor ClassAnnotation
    | ParamiOfCallableCtor ParamiOfCallable
    | KeywordArgForCallCtor KeywordArgForCall
@@ -1254,10 +1396,14 @@ prologify (CalledFromCtor content) = prologify_CalledFrom content
 prologify (ConstBoolTrueCtor content) = prologify_ConstBoolTrue content
 prologify (ConstNullCtor content) = prologify_ConstNull content
 prologify (GatedReturnCtor content) = prologify_GatedReturn content
+prologify (TopLevelIfThenElseGadgetCtor content) = prologify_TopLevelIfThenElseGadget content
+prologify (CallGuardedByCondInThenPartCtor content) = prologify_CallGuardedByCondInThenPart content
+prologify (CallGuardedByCondInElsePartCtor content) = prologify_CallGuardedByCondInElsePart content
 prologify (ComparisonCtor content) = prologify_Comparison content
 prologify (CallableReturnsValueCtor content) = prologify_CallableReturnsValue content
 prologify (CallableReturnsWithoutValueCtor content) = prologify_CallableReturnsWithoutValue content
 prologify (MethodOfClassCtor content) = prologify_MethodOfClass content
+prologify (MethodHasNameCtor content) = prologify_MethodHasName content
 prologify (ClassAnnotationCtor content) = prologify_ClassAnnotation content
 prologify (ParamiOfCallableCtor content) = prologify_ParamiOfCallable content
 prologify (ParamResolvedTypeCtor content) = prologify_ParamResolvedType content
@@ -1359,6 +1505,30 @@ prologify_GatedReturn' c v = printf "kb_gated_return( %s, %s )." (locationify c)
 prologify_GatedReturn :: GatedReturn -> String
 prologify_GatedReturn (GatedReturn (Cond c) (ReturnedValue v)) = prologify_GatedReturn' c v
 
+thenPartify :: Location -> String
+thenPartify l = "then_part_" ++ locationify l
+
+elsePartify :: Location -> String
+elsePartify l = "else_part_" ++ locationify l
+
+prologify_TopLevelIfThenElseGadget' :: Location -> Location -> Location -> Location -> String
+prologify_TopLevelIfThenElseGadget' callable c t e = printf "kb_top_level_if_then_else_gadget( %s, %s, %s, %s )." (locationify callable) (locationify c) (thenPartify t) (elsePartify e)
+
+prologify_TopLevelIfThenElseGadget :: TopLevelIfThenElseGadget -> String
+prologify_TopLevelIfThenElseGadget (TopLevelIfThenElseGadget (Callable callable) (Cond c) (ThenPart t) (ElsePart e)) = prologify_TopLevelIfThenElseGadget' callable c t e
+
+prologify_CallGuardedByCondInThenPart' :: Location -> Location -> Location -> String
+prologify_CallGuardedByCondInThenPart' call c t = printf "kb_call_guarded_by_cond_in_then_part( %s, %s, %s )." (locationify call) (locationify c) (thenPartify t)
+
+prologify_CallGuardedByCondInThenPart :: CallGuardedByCondInThenPart -> String
+prologify_CallGuardedByCondInThenPart (CallGuardedByCondInThenPart (Call call) (Cond c) (ThenPart t)) = prologify_CallGuardedByCondInThenPart' call c t
+
+prologify_CallGuardedByCondInElsePart' :: Location -> Location -> Location -> String
+prologify_CallGuardedByCondInElsePart' call c e = printf "kb_call_guarded_by_cond_in_else_part( %s, %s, %s )." (locationify call) (locationify c) (elsePartify e)
+
+prologify_CallGuardedByCondInElsePart :: CallGuardedByCondInElsePart -> String
+prologify_CallGuardedByCondInElsePart (CallGuardedByCondInElsePart (Call call) (Cond c) (ElsePart e)) = prologify_CallGuardedByCondInElsePart' call c e
+
 prologify_Comparison' :: Location -> Location -> Location -> String -> String
 prologify_Comparison' c l r op = printf "kb_comparison( %s, %s, %s, %s )." (locationify c) (locationify l) (locationify r) op
 
@@ -1382,6 +1552,12 @@ prologify_MethodOfClass' m c = printf "kb_method_of_class( %s, %s )." (locationi
 
 prologify_MethodOfClass :: MethodOfClass -> String
 prologify_MethodOfClass (MethodOfClass (Method m) (Class c)) = prologify_MethodOfClass' m c
+
+prologify_MethodHasName' :: Location -> String -> String
+prologify_MethodHasName' m name = printf "kb_method_has_name( %s, \'%s\' )." (locationify m) name
+
+prologify_MethodHasName :: MethodHasName -> String
+prologify_MethodHasName (MethodHasName (Method m) (Token.MethodName (Token.Named name _))) = prologify_MethodHasName' m name
 
 prologify_ClassHas1stPartySuper' :: Location -> String -> FilePath -> String
 prologify_ClassHas1stPartySuper' c s f = printf "kb_class_has_1st_party_super( %s, \'%s\', \'%s\' )." (locationify c) s f

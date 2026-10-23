@@ -1,16 +1,26 @@
 module SmokeTests (runSmokeTests) where
 
 import Kbgen
-    ( Cond (..)
+    ( Call (..)
+    , CallGuardedByCondInElsePart (..)
+    , CallGuardedByCondInThenPart (..)
+    , Callable (..)
+    , Cond (..)
     , ConstNull (..)
+    , ElsePart (..)
     , Fact (..)
     , GatedReturn (..)
+    , Method (..)
+    , MethodHasName (..)
     , ReturnedValue (..)
+    , ThenPart (..)
+    , TopLevelIfThenElseGadget (..)
     , locationify
     , prologify
     , restoreloc
     )
 import Location (Location (..))
+import qualified Token
 import Test.Hspec (Spec, hspec, it, shouldBe)
 
 it' :: IO () -> String -> Spec
@@ -70,6 +80,38 @@ testPrologifyGatedReturn =
         expected = "kb_gated_return( " ++ locationify condLoc ++ ", " ++ locationify retLoc ++ " )."
     in prologify (GatedReturnCtor gr) `shouldBe` expected
 
+testPrologifyMethodHasName :: IO ()
+testPrologifyMethodHasName =
+    let methodLoc = sampleLoc 1
+        name = Token.MethodName (Token.Named "oidc" (sampleLoc 2))
+        mn = MethodHasName (Method methodLoc) name
+        expected = "kb_method_has_name( " ++ locationify methodLoc ++ ", 'oidc' )."
+    in prologify (MethodHasNameCtor mn) `shouldBe` expected
+
+testPrologifyTopLevelIfThenElseGadget :: IO ()
+testPrologifyTopLevelIfThenElseGadget =
+    let callableLoc = sampleLoc 1
+        condLoc = sampleLoc 2
+        g = TopLevelIfThenElseGadget (Callable callableLoc) (Cond condLoc) (ThenPart condLoc) (ElsePart condLoc)
+        expected = "kb_top_level_if_then_else_gadget( " ++ locationify callableLoc ++ ", " ++ locationify condLoc ++ ", then_part_" ++ locationify condLoc ++ ", else_part_" ++ locationify condLoc ++ " )."
+    in prologify (TopLevelIfThenElseGadgetCtor g) `shouldBe` expected
+
+testPrologifyCallGuardedByCondInThenPart :: IO ()
+testPrologifyCallGuardedByCondInThenPart =
+    let callLoc = sampleLoc 1
+        condLoc = sampleLoc 2
+        c = CallGuardedByCondInThenPart (Call callLoc) (Cond condLoc) (ThenPart condLoc)
+        expected = "kb_call_guarded_by_cond_in_then_part( " ++ locationify callLoc ++ ", " ++ locationify condLoc ++ ", then_part_" ++ locationify condLoc ++ " )."
+    in prologify (CallGuardedByCondInThenPartCtor c) `shouldBe` expected
+
+testPrologifyCallGuardedByCondInElsePart :: IO ()
+testPrologifyCallGuardedByCondInElsePart =
+    let callLoc = sampleLoc 1
+        condLoc = sampleLoc 2
+        c = CallGuardedByCondInElsePart (Call callLoc) (Cond condLoc) (ElsePart condLoc)
+        expected = "kb_call_guarded_by_cond_in_else_part( " ++ locationify callLoc ++ ", " ++ locationify condLoc ++ ", else_part_" ++ locationify condLoc ++ " )."
+    in prologify (CallGuardedByCondInElsePartCtor c) `shouldBe` expected
+
 tests :: Spec
 tests = do
     it' testCompletelyInvalidLocationString "completelyInvalidLocationString should return Nothing"
@@ -79,6 +121,10 @@ tests = do
     it' testLocationStringWithoutProperFormatExample3 "locationStringWithoutProperFormatExample3 should return Nothing"
     it' testPrologifyConstNull "prologify_ConstNull should render kb_const_null( <loc> )."
     it' testPrologifyGatedReturn "prologify_GatedReturn should render kb_gated_return( <cond>, <ret> )."
+    it' testPrologifyMethodHasName "prologify_MethodHasName should render kb_method_has_name( <method>, '<name>' )."
+    it' testPrologifyTopLevelIfThenElseGadget "prologify_TopLevelIfThenElseGadget should render kb_top_level_if_then_else_gadget( <callable>, <cond>, then_part_<cond>, else_part_<cond> )."
+    it' testPrologifyCallGuardedByCondInThenPart "prologify_CallGuardedByCondInThenPart should render kb_call_guarded_by_cond_in_then_part( <call>, <cond>, then_part_<cond> )."
+    it' testPrologifyCallGuardedByCondInElsePart "prologify_CallGuardedByCondInElsePart should render kb_call_guarded_by_cond_in_else_part( <call>, <cond>, else_part_<cond> )."
 
 runSmokeTests :: IO ()
 runSmokeTests = hspec tests
