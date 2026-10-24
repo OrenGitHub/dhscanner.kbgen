@@ -33,7 +33,7 @@ description:
         * explain in plain English your query's purpose
         * et voilà !
 
-version:            2.3.0
+version:            2.4.0
 license:            GPL-3.0-only
 license-file:       LICENSE
 author:             OrenGitHub
@@ -92,6 +92,7 @@ test-suite restoreloc
         base,
         dhscanner-kbgen,
         dhscanner-ast,
+        dhscanner-bitcode,
         hspec,
         QuickCheck
 

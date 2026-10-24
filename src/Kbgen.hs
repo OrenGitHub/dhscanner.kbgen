@@ -110,6 +110,8 @@ module Kbgen (
     MethodName(..),
     ResolvedType(..),
     CallResolved(..),
+    FieldReadResolved(..),
+    FieldRead(..),
     CalledFrom(..),
     AssignedValue(..),
     ResolvedSuper(..),
@@ -896,6 +898,49 @@ data CallResolved = CallResolved
 -- This is how the fact will look inside the Prolog file
 --
 -- @
+-- kb_field_read_resolved( FieldRead, Fqn ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- Reading a field of an imported name ( an enum constant, a static
+-- field ) carries the resolved fqn of what was read :
+--
+-- @
+-- import org.springframework.web.bind.annotation.RequestMethod;
+--
+-- \@RequestMapping( method = RequestMethod.GET )
+-- public void oidc( ... ) { ... }
+-- @
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- spring_request_mapping_get( Mapping ) :-
+--     kb_keyword_arg_for_call( 'method', FieldRead, Mapping ),
+--     kb_field_read_resolved( FieldRead, 'org.springframework.web.bind.annotation.RequestMethod.GET' ).
+-- @
+--
+-- Other facts combined in this example predicate:
+--
+--     * 'KeywordArgForCall'
+--
+-- The @FieldRead@ slot is the location of the field read expression,
+-- which is also where it shows up as an argument ( 'ArgiForCall',
+-- 'KeywordArgForCall' ) or as a dataflow node ( 'DataflowEdge' ).
+--
+data FieldReadResolved = FieldReadResolved
+    FieldRead -- ^
+    Resolved -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
 -- kb_called_from( Call, Callable ).
 -- @
 --
@@ -1290,6 +1335,7 @@ data DataflowEdge = DataflowEdge
 
 data Arg = Arg Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Call = Call Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data FieldRead = FieldRead Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Param = Param Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Class = Class Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
@@ -1346,6 +1392,7 @@ data Fact
    | ConstIntegerCtor ConstInteger
    | DataflowEdgeCtor DataflowEdge
    | CallResolvedCtor CallResolved
+   | FieldReadResolvedCtor FieldReadResolved
    | CalledFromCtor CalledFrom
    | ConstBoolTrueCtor ConstBoolTrue
    | ConstNullCtor ConstNull
@@ -1392,6 +1439,7 @@ prologify (ConstStringCtor content) = prologify_ConstString content
 prologify (ConstIntegerCtor content) = prologify_ConstInteger content
 prologify (DataflowEdgeCtor content) = prologify_DataflowEdge content
 prologify (CallResolvedCtor content) = prologify_CallResolved content
+prologify (FieldReadResolvedCtor content) = prologify_FieldReadResolved content
 prologify (CalledFromCtor content) = prologify_CalledFrom content
 prologify (ConstBoolTrueCtor content) = prologify_ConstBoolTrue content
 prologify (ConstNullCtor content) = prologify_ConstNull content
@@ -1486,6 +1534,12 @@ prologify_DataflowEdge' u v = printf "kb_dataflow_edge( %s, %s )." (locationify 
 
 prologify_CallResolved :: CallResolved -> String
 prologify_CallResolved (CallResolved (Call call) (Resolved fqn)) = prologify_CallResolved' call fqn
+
+prologify_FieldReadResolved' :: Location -> Fqn.Fqn -> String
+prologify_FieldReadResolved' r fqn = printf "kb_field_read_resolved( %s, '%s' )." (locationify r) (quoted (prologifyFqn fqn))
+
+prologify_FieldReadResolved :: FieldReadResolved -> String
+prologify_FieldReadResolved (FieldReadResolved (FieldRead r) (Resolved fqn)) = prologify_FieldReadResolved' r fqn
 
 prologify_ConstBoolTrue' :: Location -> String
 prologify_ConstBoolTrue' trueValue = printf "kb_class_name( %s, \'%s\' )." (locationify trueValue)

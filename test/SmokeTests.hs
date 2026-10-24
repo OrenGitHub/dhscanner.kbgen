@@ -9,9 +9,12 @@ import Kbgen
     , ConstNull (..)
     , ElsePart (..)
     , Fact (..)
+    , FieldRead (..)
+    , FieldReadResolved (..)
     , GatedReturn (..)
     , Method (..)
     , MethodHasName (..)
+    , Resolved (..)
     , ReturnedValue (..)
     , ThenPart (..)
     , TopLevelIfThenElseGadget (..)
@@ -19,6 +22,7 @@ import Kbgen
     , prologify
     , restoreloc
     )
+import qualified Fqn
 import Location (Location (..))
 import qualified Token
 import Test.Hspec (Spec, hspec, it, shouldBe)
@@ -88,6 +92,15 @@ testPrologifyMethodHasName =
         expected = "kb_method_has_name( " ++ locationify methodLoc ++ ", 'oidc' )."
     in prologify (MethodHasNameCtor mn) `shouldBe` expected
 
+testPrologifyFieldReadResolved :: IO ()
+testPrologifyFieldReadResolved =
+    let readLoc = sampleLoc 1
+        requestMethod = Fqn.ThirdPartyImport (Fqn.ThirdPartyImportContent "org" ["springframework", "web", "bind", "annotation"] (Just "RequestMethod") Nothing)
+        get = Token.FieldName (Token.Named "GET" (sampleLoc 2))
+        r = FieldReadResolved (FieldRead readLoc) (Resolved (Fqn.FieldedAccess requestMethod get))
+        expected = "kb_field_read_resolved( " ++ locationify readLoc ++ ", 'org.springframework.web.bind.annotation.RequestMethod.GET' )."
+    in prologify (FieldReadResolvedCtor r) `shouldBe` expected
+
 testPrologifyTopLevelIfThenElseGadget :: IO ()
 testPrologifyTopLevelIfThenElseGadget =
     let callableLoc = sampleLoc 1
@@ -122,6 +135,7 @@ tests = do
     it' testPrologifyConstNull "prologify_ConstNull should render kb_const_null( <loc> )."
     it' testPrologifyGatedReturn "prologify_GatedReturn should render kb_gated_return( <cond>, <ret> )."
     it' testPrologifyMethodHasName "prologify_MethodHasName should render kb_method_has_name( <method>, '<name>' )."
+    it' testPrologifyFieldReadResolved "prologify_FieldReadResolved should render kb_field_read_resolved( <field read>, '<fqn>' )."
     it' testPrologifyTopLevelIfThenElseGadget "prologify_TopLevelIfThenElseGadget should render kb_top_level_if_then_else_gadget( <callable>, <cond>, then_part_<cond>, else_part_<cond> )."
     it' testPrologifyCallGuardedByCondInThenPart "prologify_CallGuardedByCondInThenPart should render kb_call_guarded_by_cond_in_then_part( <call>, <cond>, then_part_<cond> )."
     it' testPrologifyCallGuardedByCondInElsePart "prologify_CallGuardedByCondInElsePart should render kb_call_guarded_by_cond_in_else_part( <call>, <cond>, else_part_<cond> )."
