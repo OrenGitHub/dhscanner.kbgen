@@ -59,6 +59,9 @@ module Kbgen (
     Call1stPartyFuncDefinedInDir(..),
     AssignValueToToplevelVarName(..),
     Call1stPartyFuncDefinedInFile(..),
+    CallMethodOf1stPartyImport(..),
+    ImportedName(..),
+    ImportedFromFile(..),
     ParamName(..),
     CallMethodOfClass(..),
     ConstString(..),
@@ -124,7 +127,8 @@ module Kbgen (
     ConstInt(..),
     Fact(..),
     locationify,
-    restoreloc
+    restoreloc,
+    prologifyFqn
 )
 
 where
@@ -385,6 +389,67 @@ data Call1stPartyFuncDefinedInFile = Call1stPartyFuncDefinedInFile
     Call -- ^
     FuncName -- ^
     FuncDefinedInFile -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_call_method_of_1st_party_import( Call, Method, Name, File ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- A method called on a name imported from a 1st party file : a class,
+-- an object, a module level value. @Name@ is the imported name, @File@
+-- the file that defines it ( the same spelling as in 'ClassDef' and
+-- 'FuncDef' ).
+--
+-- @
+-- // util/PathUtil.java
+-- package org.example.util;
+-- public class PathUtil {
+--     public static File normalize( String path ) { ... }
+-- }
+--
+-- // web/Upload.java
+-- import org.example.util.PathUtil;
+-- ...
+-- PathUtil.normalize( base + "/" + name )
+-- @
+--
+-- @
+-- kb_call_method_of_1st_party_import( Call, \'normalize\', \'PathUtil\', \'util/PathUtil.java\' ).
+-- @
+--
+-- Only one member deep : @Name.m( .. )@. A longer chain
+-- ( @Name.a.m( .. )@ ) and a call of the imported name itself are
+-- 'CallResolved' facts only.
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- callgraph_1st_party_import_callee( Call, Callee ) :-
+--     kb_call_method_of_1st_party_import( Call, Method, Name, File ),
+--     kb_class_def( Class, Name, File ),
+--     kb_method_of_class( Callee, Class ),
+--     kb_method_has_name( Callee, Method ).
+-- @
+--
+-- Other facts combined in this predicate:
+--
+--     * 'ClassDef'
+--     * 'MethodOfClass'
+--     * 'MethodHasName'
+--
+data CallMethodOf1stPartyImport = CallMethodOf1stPartyImport
+    Call -- ^
+    MethodName -- ^
+    ImportedName -- ^
+    ImportedFromFile -- ^
     deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
 data AssignValueToToplevelVarName = AssignValueToToplevelVarName
@@ -1368,6 +1433,8 @@ data SuperQualifiedName = SuperQualifiedName Fqn.Fqn deriving ( Show, Eq, Ord, G
 
 data FuncDefinedInDir = FuncDefinedInDir FilePath deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data FuncDefinedInFile = FuncDefinedInFile FilePath deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data ImportedName = ImportedName String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data ImportedFromFile = ImportedFromFile FilePath deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ClassDefinedInFile = ClassDefinedInFile FilePath deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data SuperDefinedInFile = SuperDefinedInFile FilePath deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
@@ -1418,6 +1485,7 @@ data Fact
    | AssignValueToToplevelVarNameCtor AssignValueToToplevelVarName
    | Call1stPartyFuncDefinedInDirCtor Call1stPartyFuncDefinedInDir
    | Call1stPartyFuncDefinedInFileCtor Call1stPartyFuncDefinedInFile
+   | CallMethodOf1stPartyImportCtor CallMethodOf1stPartyImport
    | CallMethodOfUntypedNamedParamCtor CallMethodOfUntypedNamedParam
    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
@@ -1465,6 +1533,7 @@ prologify (ClassHas3rdPartySuperCtor content) = prologify_ClassHas3rdPartySuper 
 prologify (AssignValueToToplevelVarNameCtor content) = prologify_AssignValueToToplevelVarName content
 prologify (Call1stPartyFuncDefinedInDirCtor content) = prologify_Call1stPartyFuncDefinedInDir content
 prologify (Call1stPartyFuncDefinedInFileCtor content) = prologify_Call1stPartyFuncDefinedInFile content
+prologify (CallMethodOf1stPartyImportCtor content) = prologify_CallMethodOf1stPartyImport content
 prologify (CallMethodOfUntypedNamedParamCtor content) = prologify_CallMethodOfUntypedNamedParam content
 
 prologify_ParamResolvedType' :: Location -> String -> String
@@ -1520,11 +1589,11 @@ prologify_ConstInteger :: ConstInteger -> String
 prologify_ConstInteger (ConstInteger (ConstInt loc) (Token.ConstInt value _)) = prologify_ConstInteger' loc value
 
 prologify_CallResolved'' :: Location -> String -> Token.ClassName -> String
-prologify_CallResolved'' call m c = printf "kb_call_method_of_class( %s, %s, %s )." (locationify call) m (locationify (Token.getClassNameLocation c))
+prologify_CallResolved'' call m c = printf "kb_call_method_of_class( %s, \'%s\', %s )." (locationify call) (quoted m) (locationify (Token.getClassNameLocation c))
 
 prologify_CallResolved' :: Location -> Fqn.Fqn -> String
 prologify_CallResolved' call (Fqn.CallMethodOfClass _ m c) = prologify_CallResolved'' call m c 
-prologify_CallResolved' call fqn = printf "kb_call_resolved( %s, \'%s\' )." (locationify call) (prologifyFqn fqn)
+prologify_CallResolved' call fqn = printf "kb_call_resolved( %s, \'%s\' )." (locationify call) (quoted (prologifyFqn fqn))
 
 prologify_DataflowEdge :: DataflowEdge -> String
 prologify_DataflowEdge (DataflowEdge (From u) (To v)) = prologify_DataflowEdge' u v
@@ -1643,6 +1712,10 @@ prologify_Call1stPartyFuncDefinedInFile' (Call call) (FuncName func) (FuncDefine
 prologify_Call1stPartyFuncDefinedInFile'' :: Location -> String -> FilePath -> String
 prologify_Call1stPartyFuncDefinedInFile'' call func f = printf "kb_call_1st_party_func_defined_in_file( %s, \'%s\', \'%s\' )." (locationify call) func f
 
+prologify_CallMethodOf1stPartyImport :: CallMethodOf1stPartyImport -> String
+prologify_CallMethodOf1stPartyImport (CallMethodOf1stPartyImport (Call call) (MethodName m) (ImportedName name) (ImportedFromFile f)) =
+    printf "kb_call_method_of_1st_party_import( %s, \'%s\', \'%s\', \'%s\' )." (locationify call) (quoted m) (quoted name) (quoted f)
+
 prologify_Call1stPartyFuncDefinedInDir :: Call1stPartyFuncDefinedInDir -> String
 prologify_Call1stPartyFuncDefinedInDir (Call1stPartyFuncDefinedInDir call func d) = prologify_Call1stPartyFuncDefinedInDir' call func d
 
@@ -1722,10 +1795,51 @@ normalizeChar c = [c]
 normalize :: FilePath -> FilePath
 normalize path = concatMap normalizeChar path
 
+-- | The atom spelling of a resolved fqn ( 'CallResolved', 'FieldReadResolved',
+-- 'ParamResolvedType', 'ClassHas3rdPartySuper' ). A 3rd party fqn is its
+-- dotted name ( @javax.imageio.ImageIO.read@ ), a native type its plain
+-- name ( @string@ ), a receiver that could not be typed is @Unknown@.
+-- 1st party roots are tagged, @\<tag\>[ .. ]@ ( the same convention as
+-- @\<dhscanner-instrumentation\>[ .. ]@ ), so they never spell a 3rd
+-- party fqn :
+--
+-- @
+-- \<1st-party\>[File].Name.m          a name imported from a 1st party file
+-- \<1st-party-dir\>[Dir].Alias.m      a 1st party package ( dir ) import
+-- \<1st-party-class\>[Class].m        a 1st party class ( or a call of its method )
+-- \<this\>[Class].m , \<self\>[Class].m
+-- \<param\>[Param].m                  a method of an untyped param
+-- @
+--
+-- The spelling is for reading a kb and for exact matches only : a
+-- predicate that needs the parts joins on the structured facts
+-- ( 'CallMethodOf1stPartyImport', 'CallMethodOfClass', 'ClassDef', .. ).
 prologifyFqn :: Fqn.Fqn -> String
 prologifyFqn (Fqn.ThirdPartyImport fqn) = prologifyThirdPartyImport fqn
 prologifyFqn (Fqn.FieldedAccess fqn fieldName) = prologifyFieldedAccess fqn fieldName
-prologifyFqn fqn = show fqn
+prologifyFqn Fqn.NativeTypeInt = "int"
+prologifyFqn Fqn.NativeTypeString = "string"
+prologifyFqn Fqn.NativeTypeBool = "bool"
+prologifyFqn Fqn.NativeTypeNull = "null"
+prologifyFqn (Fqn.NativeTypeConstInt _) = "int"
+prologifyFqn (Fqn.NativeTypeConstStr _) = "string"
+prologifyFqn (Fqn.NativeTypeConstBool _) = "bool"
+prologifyFqn (Fqn.ClassName (Fqn.ClassNameContent c)) = tagged "1st-party-class" (className c)
+prologifyFqn (Fqn.ClassInstance (Fqn.ClassInstanceContent Fqn.Self c)) = tagged "self" (className c)
+prologifyFqn (Fqn.ClassInstance (Fqn.ClassInstanceContent Fqn.This c)) = tagged "this" (className c)
+prologifyFqn (Fqn.CallMethodOfClass _ m c) = tagged "1st-party-class" (className c) ++ "." ++ m
+prologifyFqn (Fqn.CallMethodOfUntypedNamedParam _ m (Token.ParamName (Token.Named p _))) = tagged "param" p ++ "." ++ m
+prologifyFqn (Fqn.CallFuncFromImportedDir _ f d) = tagged "1st-party-dir" d ++ "." ++ f
+prologifyFqn (Fqn.CallFuncFromImportedFile _ f file) = tagged "1st-party" file ++ "." ++ f
+prologifyFqn (Fqn.FirstPartyImport (Fqn.FirstPartyImportContent file name)) = tagged "1st-party" file ++ maybe "" ("." ++) name
+prologifyFqn (Fqn.FirstPartyDirImport (Fqn.FirstPartyDirImportContent d alias)) = tagged "1st-party-dir" d ++ maybe "" ("." ++) alias
+prologifyFqn Fqn.Unknown = "Unknown"
+
+tagged :: String -> String -> String
+tagged tag value = "<" ++ tag ++ ">[" ++ value ++ "]"
+
+className :: Token.ClassName -> String
+className (Token.ClassName (Token.Named name _)) = name
 
 prologifyThirdPartyImport :: Fqn.ThirdPartyImportContent -> String
 prologifyThirdPartyImport (Fqn.ThirdPartyImportContent p [] Nothing _) = p

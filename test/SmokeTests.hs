@@ -2,6 +2,12 @@ module SmokeTests (runSmokeTests) where
 
 import Kbgen
     ( Call (..)
+    , CallMethodOf1stPartyImport (..)
+    , CallResolved (..)
+    , ImportedFromFile (..)
+    , ImportedName (..)
+    , MethodName (..)
+    , prologifyFqn
     , CallGuardedByCondInElsePart (..)
     , CallGuardedByCondInThenPart (..)
     , Callable (..)
@@ -125,8 +131,77 @@ testPrologifyCallGuardedByCondInElsePart =
         expected = "kb_call_guarded_by_cond_in_else_part( " ++ locationify callLoc ++ ", " ++ locationify condLoc ++ ", else_part_" ++ locationify condLoc ++ " )."
     in prologify (CallGuardedByCondInElsePartCtor c) `shouldBe` expected
 
+pathUtil :: Fqn.Fqn
+pathUtil = Fqn.FirstPartyImport (Fqn.FirstPartyImportContent "util/PathUtil.java" (Just "PathUtil"))
+
+member :: String -> Token.FieldName
+member name = Token.FieldName (Token.Named name (sampleLoc 2))
+
+-- no Haskell `show` leaks into a kb atom
+testPrologifyCallResolved1stPartyImport :: IO ()
+testPrologifyCallResolved1stPartyImport =
+    let callLoc = sampleLoc 1
+        c = CallResolved (Call callLoc) (Resolved (Fqn.FieldedAccess pathUtil (member "normalize")))
+        expected = "kb_call_resolved( " ++ locationify callLoc ++ ", '<1st-party>[util/PathUtil.java].PathUtil.normalize' )."
+    in prologify (CallResolvedCtor c) `shouldBe` expected
+
+testPrologifyFqnShapes :: IO ()
+testPrologifyFqnShapes =
+    let klass = Token.ClassName (Token.Named "Foo" (sampleLoc 3))
+        param = Token.ParamName (Token.Named "res" (sampleLoc 4))
+    in map prologifyFqn
+        [ Fqn.NativeTypeString
+        , Fqn.NativeTypeConstInt 7
+        , Fqn.ClassName (Fqn.ClassNameContent klass)
+        , Fqn.FieldedAccess (Fqn.ClassInstance (Fqn.ClassInstanceContent Fqn.This klass)) (member "m")
+        , Fqn.FieldedAccess (Fqn.CallMethodOfClass (sampleLoc 5) "build" klass) (member "run")
+        , Fqn.CallMethodOfUntypedNamedParam (sampleLoc 5) "sendFile" param
+        , Fqn.FieldedAccess (Fqn.CallFuncFromImportedFile (sampleLoc 5) "helper" "lib/a.ts") (member "x")
+        , Fqn.FirstPartyDirImport (Fqn.FirstPartyDirImportContent "pkg/util" Nothing)
+        , Fqn.FieldedAccess Fqn.Unknown (member "to_i")
+        ] `shouldBe`
+        [ "string"
+        , "int"
+        , "<1st-party-class>[Foo]"
+        , "<this>[Foo].m"
+        , "<1st-party-class>[Foo].build.run"
+        , "<param>[res].sendFile"
+        , "<1st-party>[lib/a.ts].helper.x"
+        , "<1st-party-dir>[pkg/util]"
+        , "Unknown.to_i"
+        ]
+
+testPrologifyCallMethodOf1stPartyImport :: IO ()
+testPrologifyCallMethodOf1stPartyImport =
+    let callLoc = sampleLoc 1
+        c = CallMethodOf1stPartyImport (Call callLoc) (MethodName "normalize") (ImportedName "PathUtil") (ImportedFromFile "util/PathUtil.java")
+        expected = "kb_call_method_of_1st_party_import( " ++ locationify callLoc ++ ", 'normalize', 'PathUtil', 'util/PathUtil.java' )."
+    in prologify (CallMethodOf1stPartyImportCtor c) `shouldBe` expected
+
+-- a capitalized method name ( C# ) must not read as a Prolog variable
+testPrologifyCallResolvedMethodOfClassQuoted :: IO ()
+testPrologifyCallResolvedMethodOfClassQuoted =
+    let callLoc = sampleLoc 1
+        klass = Token.ClassName (Token.Named "BackupController" (sampleLoc 3))
+        c = CallResolved (Call callLoc) (Resolved (Fqn.CallMethodOfClass (sampleLoc 5) "GetBackup" klass))
+        expected = "kb_call_method_of_class( " ++ locationify callLoc ++ ", 'GetBackup', " ++ locationify (sampleLoc 3) ++ " )."
+    in prologify (CallResolvedCtor c) `shouldBe` expected
+
+testPrologifyCallResolvedEscapesQuote :: IO ()
+testPrologifyCallResolvedEscapesQuote =
+    let callLoc = sampleLoc 1
+        odd' = Fqn.FirstPartyImport (Fqn.FirstPartyImportContent "it's/a.rb" (Just "DB"))
+        c = CallResolved (Call callLoc) (Resolved (Fqn.FieldedAccess odd' (member "exec")))
+        expected = "kb_call_resolved( " ++ locationify callLoc ++ ", '<1st-party>[it\\'s/a.rb].DB.exec' )."
+    in prologify (CallResolvedCtor c) `shouldBe` expected
+
 tests :: Spec
 tests = do
+    it' testPrologifyCallResolved1stPartyImport "kb_call_resolved of a 1st party import member is tagged, not Haskell show"
+    it' testPrologifyFqnShapes "prologifyFqn spells every fqn shape without Haskell show"
+    it' testPrologifyCallMethodOf1stPartyImport "prologify_CallMethodOf1stPartyImport should render kb_call_method_of_1st_party_import( <call>, '<method>', '<name>', '<file>' )."
+    it' testPrologifyCallResolvedMethodOfClassQuoted "kb_call_method_of_class quotes the method name"
+    it' testPrologifyCallResolvedEscapesQuote "kb_call_resolved escapes a quote in the fqn"
     it' testCompletelyInvalidLocationString "completelyInvalidLocationString should return Nothing"
     it' testLocationStringWithoutProperPrefix "locationStringWithoutProperPrefix should return Nothing"
     it' testLocationStringWithoutProperFormatExample1 "locationStringWithoutProperFormatExample1 should return Nothing"
