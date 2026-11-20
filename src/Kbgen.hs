@@ -1567,13 +1567,18 @@ prologify_FuncDef :: FuncDef -> String
 prologify_FuncDef (FuncDef (Func loc) (Token.FuncName (Token.Named name _)) (FuncDefinedInFile f) (FuncDefinedInDir d)) = prologify_FuncDef' loc name f d
 
 -- | contents of a single-quoted prolog atom : backslashes and quotes
--- are escaped, so source strings like @\\[@ or @it's@ load verbatim
+-- are escaped, so source strings like @\\[@ or @it's@ load verbatim.
+-- Line breaks are escaped too ( @\\n@ / @\\r@ ), so every fact stays
+-- on one line of the kb while the atom still reads back as the
+-- original multi-line string ( dhscanner.runner#236 ).
 quoted :: String -> String
 quoted = concatMap quoted'
 
 quoted' :: Char -> String
 quoted' '\\' = "\\\\"
 quoted' '\'' = "\\'"
+quoted' '\n' = "\\n"
+quoted' '\r' = "\\r"
 quoted' c = [c]
 
 prologify_ConstString' :: Location -> String -> String

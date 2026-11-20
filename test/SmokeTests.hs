@@ -13,6 +13,8 @@ import Kbgen
     , Callable (..)
     , Cond (..)
     , ConstNull (..)
+    , ConstStr (..)
+    , ConstString (..)
     , ElsePart (..)
     , Fact (..)
     , FieldRead (..)
@@ -195,8 +197,18 @@ testPrologifyCallResolvedEscapesQuote =
         expected = "kb_call_resolved( " ++ locationify callLoc ++ ", '<1st-party>[it\\'s/a.rb].DB.exec' )."
     in prologify (CallResolvedCtor c) `shouldBe` expected
 
+-- a multi-line string constant must stay one kb line ( dhscanner.runner#236 )
+testPrologifyConstStringEscapesLineBreaks :: IO ()
+testPrologifyConstStringEscapesLineBreaks =
+    let loc = sampleLoc 1
+        value = "# first\nsecond\r\nit's \\ third"
+        c = ConstString (ConstStr loc) (Token.ConstStr value (sampleLoc 1))
+        expected = "kb_const_string( " ++ locationify loc ++ ", '# first\\nsecond\\r\\nit\\'s \\\\ third' )."
+    in prologify (ConstStringCtor c) `shouldBe` expected
+
 tests :: Spec
 tests = do
+    it' testPrologifyConstStringEscapesLineBreaks "kb_const_string escapes line breaks, so one fact = one line"
     it' testPrologifyCallResolved1stPartyImport "kb_call_resolved of a 1st party import member is tagged, not Haskell show"
     it' testPrologifyFqnShapes "prologifyFqn spells every fqn shape without Haskell show"
     it' testPrologifyCallMethodOf1stPartyImport "prologify_CallMethodOf1stPartyImport should render kb_call_method_of_1st_party_import( <call>, '<method>', '<name>', '<file>' )."
