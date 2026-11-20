@@ -59,7 +59,7 @@ module Kbgen (
     Call1stPartyFuncDefinedInDir(..),
     AssignValueToToplevelVarName(..),
     Call1stPartyFuncDefinedInFile(..),
-    CallMethodOf1stPartyImport(..),
+    CallMethodOf1stPartyImportedName(..),
     ImportedName(..),
     ImportedFromFile(..),
     ParamName(..),
@@ -398,7 +398,7 @@ data Call1stPartyFuncDefinedInFile = Call1stPartyFuncDefinedInFile
 -- This is how the fact will look inside the Prolog file
 --
 -- @
--- kb_call_method_of_1st_party_import( Call, Method, Name, File ).
+-- kb_call_method_of_1st_party_imported_name( Call, Method, Name, File ).
 -- @
 --
 -- __When should I use this fact__
@@ -422,7 +422,7 @@ data Call1stPartyFuncDefinedInFile = Call1stPartyFuncDefinedInFile
 -- @
 --
 -- @
--- kb_call_method_of_1st_party_import( Call, \'normalize\', \'PathUtil\', \'util/PathUtil.java\' ).
+-- kb_call_method_of_1st_party_imported_name( Call, \'normalize\', \'PathUtil\', \'util/PathUtil.java\' ).
 -- @
 --
 -- Only one member deep : @Name.m( .. )@. A longer chain
@@ -433,7 +433,7 @@ data Call1stPartyFuncDefinedInFile = Call1stPartyFuncDefinedInFile
 --
 -- @
 -- callgraph_1st_party_import_callee( Call, Callee ) :-
---     kb_call_method_of_1st_party_import( Call, Method, Name, File ),
+--     kb_call_method_of_1st_party_imported_name( Call, Method, Name, File ),
 --     kb_class_def( Class, Name, File ),
 --     kb_method_of_class( Callee, Class ),
 --     kb_method_has_name( Callee, Method ).
@@ -445,7 +445,7 @@ data Call1stPartyFuncDefinedInFile = Call1stPartyFuncDefinedInFile
 --     * 'MethodOfClass'
 --     * 'MethodHasName'
 --
-data CallMethodOf1stPartyImport = CallMethodOf1stPartyImport
+data CallMethodOf1stPartyImportedName = CallMethodOf1stPartyImportedName
     Call -- ^
     MethodName -- ^
     ImportedName -- ^
@@ -1485,7 +1485,7 @@ data Fact
    | AssignValueToToplevelVarNameCtor AssignValueToToplevelVarName
    | Call1stPartyFuncDefinedInDirCtor Call1stPartyFuncDefinedInDir
    | Call1stPartyFuncDefinedInFileCtor Call1stPartyFuncDefinedInFile
-   | CallMethodOf1stPartyImportCtor CallMethodOf1stPartyImport
+   | CallMethodOf1stPartyImportedNameCtor CallMethodOf1stPartyImportedName
    | CallMethodOfUntypedNamedParamCtor CallMethodOfUntypedNamedParam
    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
@@ -1533,7 +1533,7 @@ prologify (ClassHas3rdPartySuperCtor content) = prologify_ClassHas3rdPartySuper 
 prologify (AssignValueToToplevelVarNameCtor content) = prologify_AssignValueToToplevelVarName content
 prologify (Call1stPartyFuncDefinedInDirCtor content) = prologify_Call1stPartyFuncDefinedInDir content
 prologify (Call1stPartyFuncDefinedInFileCtor content) = prologify_Call1stPartyFuncDefinedInFile content
-prologify (CallMethodOf1stPartyImportCtor content) = prologify_CallMethodOf1stPartyImport content
+prologify (CallMethodOf1stPartyImportedNameCtor content) = prologify_CallMethodOf1stPartyImportedName content
 prologify (CallMethodOfUntypedNamedParamCtor content) = prologify_CallMethodOfUntypedNamedParam content
 
 prologify_ParamResolvedType' :: Location -> String -> String
@@ -1717,9 +1717,9 @@ prologify_Call1stPartyFuncDefinedInFile' (Call call) (FuncName func) (FuncDefine
 prologify_Call1stPartyFuncDefinedInFile'' :: Location -> String -> FilePath -> String
 prologify_Call1stPartyFuncDefinedInFile'' call func f = printf "kb_call_1st_party_func_defined_in_file( %s, \'%s\', \'%s\' )." (locationify call) func f
 
-prologify_CallMethodOf1stPartyImport :: CallMethodOf1stPartyImport -> String
-prologify_CallMethodOf1stPartyImport (CallMethodOf1stPartyImport (Call call) (MethodName m) (ImportedName name) (ImportedFromFile f)) =
-    printf "kb_call_method_of_1st_party_import( %s, \'%s\', \'%s\', \'%s\' )." (locationify call) (quoted m) (quoted name) (quoted f)
+prologify_CallMethodOf1stPartyImportedName :: CallMethodOf1stPartyImportedName -> String
+prologify_CallMethodOf1stPartyImportedName (CallMethodOf1stPartyImportedName (Call call) (MethodName m) (ImportedName name) (ImportedFromFile f)) =
+    printf "kb_call_method_of_1st_party_imported_name( %s, \'%s\', \'%s\', \'%s\' )." (locationify call) (quoted m) (quoted name) (quoted f)
 
 prologify_Call1stPartyFuncDefinedInDir :: Call1stPartyFuncDefinedInDir -> String
 prologify_Call1stPartyFuncDefinedInDir (Call1stPartyFuncDefinedInDir call func d) = prologify_Call1stPartyFuncDefinedInDir' call func d
@@ -1818,7 +1818,7 @@ normalize path = concatMap normalizeChar path
 --
 -- The spelling is for reading a kb and for exact matches only : a
 -- predicate that needs the parts joins on the structured facts
--- ( 'CallMethodOf1stPartyImport', 'CallMethodOfClass', 'ClassDef', .. ).
+-- ( 'CallMethodOf1stPartyImportedName', 'CallMethodOfClass', 'ClassDef', .. ).
 prologifyFqn :: Fqn.Fqn -> String
 prologifyFqn (Fqn.ThirdPartyImport fqn) = prologifyThirdPartyImport fqn
 prologifyFqn (Fqn.FieldedAccess fqn fieldName) = prologifyFieldedAccess fqn fieldName

@@ -2,7 +2,7 @@ module SmokeTests (runSmokeTests) where
 
 import Kbgen
     ( Call (..)
-    , CallMethodOf1stPartyImport (..)
+    , CallMethodOf1stPartyImportedName (..)
     , CallResolved (..)
     , ImportedFromFile (..)
     , ImportedName (..)
@@ -173,12 +173,12 @@ testPrologifyFqnShapes =
         , "Unknown.to_i"
         ]
 
-testPrologifyCallMethodOf1stPartyImport :: IO ()
-testPrologifyCallMethodOf1stPartyImport =
+testPrologifyCallMethodOf1stPartyImportedName :: IO ()
+testPrologifyCallMethodOf1stPartyImportedName =
     let callLoc = sampleLoc 1
-        c = CallMethodOf1stPartyImport (Call callLoc) (MethodName "normalize") (ImportedName "PathUtil") (ImportedFromFile "util/PathUtil.java")
-        expected = "kb_call_method_of_1st_party_import( " ++ locationify callLoc ++ ", 'normalize', 'PathUtil', 'util/PathUtil.java' )."
-    in prologify (CallMethodOf1stPartyImportCtor c) `shouldBe` expected
+        c = CallMethodOf1stPartyImportedName (Call callLoc) (MethodName "normalize") (ImportedName "PathUtil") (ImportedFromFile "util/PathUtil.java")
+        expected = "kb_call_method_of_1st_party_imported_name( " ++ locationify callLoc ++ ", 'normalize', 'PathUtil', 'util/PathUtil.java' )."
+    in prologify (CallMethodOf1stPartyImportedNameCtor c) `shouldBe` expected
 
 -- a capitalized method name ( C# ) must not read as a Prolog variable
 testPrologifyCallResolvedMethodOfClassQuoted :: IO ()
@@ -211,7 +211,7 @@ tests = do
     it' testPrologifyConstStringEscapesLineBreaks "kb_const_string escapes line breaks, so one fact = one line"
     it' testPrologifyCallResolved1stPartyImport "kb_call_resolved of a 1st party import member is tagged, not Haskell show"
     it' testPrologifyFqnShapes "prologifyFqn spells every fqn shape without Haskell show"
-    it' testPrologifyCallMethodOf1stPartyImport "prologify_CallMethodOf1stPartyImport should render kb_call_method_of_1st_party_import( <call>, '<method>', '<name>', '<file>' )."
+    it' testPrologifyCallMethodOf1stPartyImportedName "prologify_CallMethodOf1stPartyImportedName should render kb_call_method_of_1st_party_imported_name( <call>, '<method>', '<name>', '<file>' )."
     it' testPrologifyCallResolvedMethodOfClassQuoted "kb_call_method_of_class quotes the method name"
     it' testPrologifyCallResolvedEscapesQuote "kb_call_resolved escapes a quote in the fqn"
     it' testCompletelyInvalidLocationString "completelyInvalidLocationString should return Nothing"
