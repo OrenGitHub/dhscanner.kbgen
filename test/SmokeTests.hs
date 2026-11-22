@@ -3,6 +3,8 @@ module SmokeTests (runSmokeTests) where
 import Kbgen
     ( Call (..)
     , CallMethodOf1stPartyImportedName (..)
+    , FieldReadOf1stPartyImportedName (..)
+    , FieldName (..)
     , CallResolved (..)
     , ImportedFromFile (..)
     , ImportedName (..)
@@ -180,6 +182,13 @@ testPrologifyCallMethodOf1stPartyImportedName =
         expected = "kb_call_method_of_1st_party_imported_name( " ++ locationify callLoc ++ ", 'normalize', 'PathUtil', 'util/PathUtil.java' )."
     in prologify (CallMethodOf1stPartyImportedNameCtor c) `shouldBe` expected
 
+testPrologifyFieldReadOf1stPartyImportedName :: IO ()
+testPrologifyFieldReadOf1stPartyImportedName =
+    let readLoc = sampleLoc 1
+        r = FieldReadOf1stPartyImportedName (FieldRead readLoc) (FieldName "class") (ImportedName "UserController") (ImportedFromFile "app/Http/Controllers/UserController.php")
+        expected = "kb_field_read_of_1st_party_imported_name( " ++ locationify readLoc ++ ", 'class', 'UserController', 'app/Http/Controllers/UserController.php' )."
+    in prologify (FieldReadOf1stPartyImportedNameCtor r) `shouldBe` expected
+
 -- a capitalized method name ( C# ) must not read as a Prolog variable
 testPrologifyCallResolvedMethodOfClassQuoted :: IO ()
 testPrologifyCallResolvedMethodOfClassQuoted =
@@ -212,6 +221,7 @@ tests = do
     it' testPrologifyCallResolved1stPartyImport "kb_call_resolved of a 1st party import member is tagged, not Haskell show"
     it' testPrologifyFqnShapes "prologifyFqn spells every fqn shape without Haskell show"
     it' testPrologifyCallMethodOf1stPartyImportedName "prologify_CallMethodOf1stPartyImportedName should render kb_call_method_of_1st_party_imported_name( <call>, '<method>', '<name>', '<file>' )."
+    it' testPrologifyFieldReadOf1stPartyImportedName "prologify_FieldReadOf1stPartyImportedName should render kb_field_read_of_1st_party_imported_name( <field read>, '<field>', '<name>', '<file>' )."
     it' testPrologifyCallResolvedMethodOfClassQuoted "kb_call_method_of_class quotes the method name"
     it' testPrologifyCallResolvedEscapesQuote "kb_call_resolved escapes a quote in the fqn"
     it' testCompletelyInvalidLocationString "completelyInvalidLocationString should return Nothing"

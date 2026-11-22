@@ -60,6 +60,7 @@ module Kbgen (
     AssignValueToToplevelVarName(..),
     Call1stPartyFuncDefinedInFile(..),
     CallMethodOf1stPartyImportedName(..),
+    FieldReadOf1stPartyImportedName(..),
     ImportedName(..),
     ImportedFromFile(..),
     ParamName(..),
@@ -111,6 +112,7 @@ module Kbgen (
     ParamIndex(..),
     FuncName(..),
     MethodName(..),
+    FieldName(..),
     ResolvedType(..),
     CallResolved(..),
     FieldReadResolved(..),
@@ -448,6 +450,55 @@ data Call1stPartyFuncDefinedInFile = Call1stPartyFuncDefinedInFile
 data CallMethodOf1stPartyImportedName = CallMethodOf1stPartyImportedName
     Call -- ^
     MethodName -- ^
+    ImportedName -- ^
+    ImportedFromFile -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_field_read_of_1st_party_imported_name( FieldRead, Field, Name, File ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- A field read on a name imported from a 1st party file : the field read
+-- counterpart of 'CallMethodOf1stPartyImportedName'. @Name@ is the imported
+-- name, @File@ the file that defines it ( the same spelling as in 'ClassDef' ).
+--
+-- @
+-- // routes/web.php
+-- use App\\Http\\Controllers\\UserController;
+-- ...
+-- Route::post( \'/studio/theme\', [ UserController::class, \'editTheme\' ] );
+-- @
+--
+-- @
+-- kb_field_read_of_1st_party_imported_name( FieldRead, \'class\', \'UserController\', \'app/Http/Controllers/UserController.php\' ).
+-- @
+--
+-- Only one member deep : @Name.f@. A field read rooted at a 3rd party
+-- import is a 'FieldReadResolved' fact.
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- php_class_of_class_constant( FieldRead, Class ) :-
+--     kb_field_read_of_1st_party_imported_name( FieldRead, \'class\', Name, File ),
+--     kb_class_def( Class, Name, File ).
+-- @
+--
+-- Other facts combined in this predicate:
+--
+--     * 'ClassDef'
+--
+data FieldReadOf1stPartyImportedName = FieldReadOf1stPartyImportedName
+    FieldRead -- ^
+    FieldName -- ^
     ImportedName -- ^
     ImportedFromFile -- ^
     deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
@@ -1428,6 +1479,7 @@ data ArgIndex = ArgIndex Word deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSO
 data ParamIndex = ParamIndex Word deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data FuncName = FuncName String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data MethodName = MethodName String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data FieldName = FieldName String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ConstStrValue = ConstStrValue String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data SuperQualifiedName = SuperQualifiedName Fqn.Fqn deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
@@ -1486,6 +1538,7 @@ data Fact
    | Call1stPartyFuncDefinedInDirCtor Call1stPartyFuncDefinedInDir
    | Call1stPartyFuncDefinedInFileCtor Call1stPartyFuncDefinedInFile
    | CallMethodOf1stPartyImportedNameCtor CallMethodOf1stPartyImportedName
+   | FieldReadOf1stPartyImportedNameCtor FieldReadOf1stPartyImportedName
    | CallMethodOfUntypedNamedParamCtor CallMethodOfUntypedNamedParam
    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
@@ -1534,6 +1587,7 @@ prologify (AssignValueToToplevelVarNameCtor content) = prologify_AssignValueToTo
 prologify (Call1stPartyFuncDefinedInDirCtor content) = prologify_Call1stPartyFuncDefinedInDir content
 prologify (Call1stPartyFuncDefinedInFileCtor content) = prologify_Call1stPartyFuncDefinedInFile content
 prologify (CallMethodOf1stPartyImportedNameCtor content) = prologify_CallMethodOf1stPartyImportedName content
+prologify (FieldReadOf1stPartyImportedNameCtor content) = prologify_FieldReadOf1stPartyImportedName content
 prologify (CallMethodOfUntypedNamedParamCtor content) = prologify_CallMethodOfUntypedNamedParam content
 
 prologify_ParamResolvedType' :: Location -> String -> String
@@ -1720,6 +1774,10 @@ prologify_Call1stPartyFuncDefinedInFile'' call func f = printf "kb_call_1st_part
 prologify_CallMethodOf1stPartyImportedName :: CallMethodOf1stPartyImportedName -> String
 prologify_CallMethodOf1stPartyImportedName (CallMethodOf1stPartyImportedName (Call call) (MethodName m) (ImportedName name) (ImportedFromFile f)) =
     printf "kb_call_method_of_1st_party_imported_name( %s, \'%s\', \'%s\', \'%s\' )." (locationify call) (quoted m) (quoted name) (quoted f)
+
+prologify_FieldReadOf1stPartyImportedName :: FieldReadOf1stPartyImportedName -> String
+prologify_FieldReadOf1stPartyImportedName (FieldReadOf1stPartyImportedName (FieldRead r) (FieldName field) (ImportedName name) (ImportedFromFile f)) =
+    printf "kb_field_read_of_1st_party_imported_name( %s, \'%s\', \'%s\', \'%s\' )." (locationify r) (quoted field) (quoted name) (quoted f)
 
 prologify_Call1stPartyFuncDefinedInDir :: Call1stPartyFuncDefinedInDir -> String
 prologify_Call1stPartyFuncDefinedInDir (Call1stPartyFuncDefinedInDir call func d) = prologify_Call1stPartyFuncDefinedInDir' call func d
