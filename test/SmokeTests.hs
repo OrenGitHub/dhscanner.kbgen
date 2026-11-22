@@ -185,8 +185,8 @@ testPrologifyCallMethodOf1stPartyImportedName =
 testPrologifyFieldReadOf1stPartyImportedName :: IO ()
 testPrologifyFieldReadOf1stPartyImportedName =
     let readLoc = sampleLoc 1
-        r = FieldReadOf1stPartyImportedName (FieldRead readLoc) (FieldName "class") (ImportedName "UserController") (ImportedFromFile "app/Http/Controllers/UserController.php")
-        expected = "kb_field_read_of_1st_party_imported_name( " ++ locationify readLoc ++ ", 'class', 'UserController', 'app/Http/Controllers/UserController.php' )."
+        r = FieldReadOf1stPartyImportedName (FieldRead readLoc) (FieldName "class") (ImportedName "PathUtil") (ImportedFromFile "src/Util/PathUtil.php")
+        expected = "kb_field_read_of_1st_party_imported_name( " ++ locationify readLoc ++ ", 'class', 'PathUtil', 'src/Util/PathUtil.php' )."
     in prologify (FieldReadOf1stPartyImportedNameCtor r) `shouldBe` expected
 
 -- a capitalized method name ( C# ) must not read as a Prolog variable
