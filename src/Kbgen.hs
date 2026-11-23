@@ -62,6 +62,7 @@ module Kbgen (
     CallMethodOf1stPartyImportedName(..),
     FieldReadOf1stPartyImportedName(..),
     ReturnValueOfCall(..),
+    CallMethodOfReturnValue(..),
     ImportedName(..),
     ImportedFromFile(..),
     ParamName(..),
@@ -528,6 +529,41 @@ data FieldReadOf1stPartyImportedName = FieldReadOf1stPartyImportedName
 data ReturnValueOfCall = ReturnValueOfCall
     ReturnValue -- ^
     Call -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_call_method_of_return_value( Call, Method, ReturnValue ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- A method called on the value another call returns, a chained call
+-- @a()->m()@ : @Call@ is the call of @m@, @ReturnValue@ the value @a()@
+-- returns ( the location of the call @a()@ ). It tells a receiver from an
+-- argument, which a dataflow edge alone does not.
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- chained_method_of_1st_party_imported_name( Call, Method, First, Name ) :-
+--     kb_call_method_of_return_value( Call, Method, ReturnValue ),
+--     kb_call_method_of_1st_party_imported_name( ReturnValue, First, Name, _ ).
+-- @
+--
+-- Other facts combined in this predicate:
+--
+--     * 'CallMethodOf1stPartyImportedName'
+--
+data CallMethodOfReturnValue = CallMethodOfReturnValue
+    Call -- ^
+    MethodName -- ^
+    ReturnValue -- ^
     deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
 data AssignValueToToplevelVarName = AssignValueToToplevelVarName
@@ -1568,6 +1604,7 @@ data Fact
    | CallMethodOf1stPartyImportedNameCtor CallMethodOf1stPartyImportedName
    | FieldReadOf1stPartyImportedNameCtor FieldReadOf1stPartyImportedName
    | ReturnValueOfCallCtor ReturnValueOfCall
+   | CallMethodOfReturnValueCtor CallMethodOfReturnValue
    | CallMethodOfUntypedNamedParamCtor CallMethodOfUntypedNamedParam
    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
@@ -1618,6 +1655,7 @@ prologify (Call1stPartyFuncDefinedInFileCtor content) = prologify_Call1stPartyFu
 prologify (CallMethodOf1stPartyImportedNameCtor content) = prologify_CallMethodOf1stPartyImportedName content
 prologify (FieldReadOf1stPartyImportedNameCtor content) = prologify_FieldReadOf1stPartyImportedName content
 prologify (ReturnValueOfCallCtor content) = prologify_ReturnValueOfCall content
+prologify (CallMethodOfReturnValueCtor content) = prologify_CallMethodOfReturnValue content
 prologify (CallMethodOfUntypedNamedParamCtor content) = prologify_CallMethodOfUntypedNamedParam content
 
 prologify_ParamResolvedType' :: Location -> String -> String
@@ -1813,6 +1851,10 @@ prologify_ReturnValueOfCall :: ReturnValueOfCall -> String
 prologify_ReturnValueOfCall (ReturnValueOfCall (ReturnValue v) (Call c)) =
     printf "kb_return_value_of_call( %s, %s )." (locationify v) (locationify c)
 
+prologify_CallMethodOfReturnValue :: CallMethodOfReturnValue -> String
+prologify_CallMethodOfReturnValue (CallMethodOfReturnValue (Call c) (MethodName m) (ReturnValue v)) =
+    printf "kb_call_method_of_return_value( %s, '%s', %s )." (locationify c) (quoted m) (locationify v)
+
 prologify_Call1stPartyFuncDefinedInDir :: Call1stPartyFuncDefinedInDir -> String
 prologify_Call1stPartyFuncDefinedInDir (Call1stPartyFuncDefinedInDir call func d) = prologify_Call1stPartyFuncDefinedInDir' call func d
 
@@ -1928,6 +1970,7 @@ prologifyFqn (Fqn.CallMethodOfClass _ m c) = tagged "1st-party-class" (className
 prologifyFqn (Fqn.CallMethodOfUntypedNamedParam _ m (Token.ParamName (Token.Named p _))) = tagged "param" p ++ "." ++ m
 prologifyFqn (Fqn.CallFuncFromImportedDir _ f d) = tagged "1st-party-dir" d ++ "." ++ f
 prologifyFqn (Fqn.CallFuncFromImportedFile _ f file) = tagged "1st-party" file ++ "." ++ f
+prologifyFqn (Fqn.ReturnTypeOf _ fqn) = prologifyFqn fqn
 prologifyFqn (Fqn.FirstPartyImport (Fqn.FirstPartyImportContent file name)) = tagged "1st-party" file ++ maybe "" ("." ++) name
 prologifyFqn (Fqn.FirstPartyDirImport (Fqn.FirstPartyDirImportContent d alias)) = tagged "1st-party-dir" d ++ maybe "" ("." ++) alias
 prologifyFqn Fqn.Unknown = "Unknown"

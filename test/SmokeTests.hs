@@ -6,6 +6,7 @@ import Kbgen
     , FieldReadOf1stPartyImportedName (..)
     , FieldName (..)
     , ReturnValueOfCall (..)
+    , CallMethodOfReturnValue (..)
     , ReturnValue (..)
     , CallResolved (..)
     , ImportedFromFile (..)
@@ -199,6 +200,21 @@ testPrologifyReturnValueOfCall =
         expected = "kb_return_value_of_call( " ++ locationify valueLoc ++ ", " ++ locationify callLoc ++ " )."
     in prologify (ReturnValueOfCallCtor r) `shouldBe` expected
 
+testPrologifyCallMethodOfReturnValue :: IO ()
+testPrologifyCallMethodOfReturnValue =
+    let callLoc = sampleLoc 1
+        valueLoc = sampleLoc 2
+        c = CallMethodOfReturnValue (Call callLoc) (MethodName "normalize") (ReturnValue valueLoc)
+        expected = "kb_call_method_of_return_value( " ++ locationify callLoc ++ ", 'normalize', " ++ locationify valueLoc ++ " )."
+    in prologify (CallMethodOfReturnValueCtor c) `shouldBe` expected
+
+-- the value a call returns spells as its callee
+testPrologifyFqnReturnTypeOf :: IO ()
+testPrologifyFqnReturnTypeOf =
+    let util = Fqn.FirstPartyImport (Fqn.FirstPartyImportContent "src/Util/PathUtil.php" (Just "PathUtil"))
+        fqn = Fqn.FieldedAccess (Fqn.ReturnTypeOf (sampleLoc 1) (Fqn.FieldedAccess util (member "create"))) (member "normalize")
+    in prologifyFqn fqn `shouldBe` "<1st-party>[src/Util/PathUtil.php].PathUtil.create.normalize"
+
 -- a capitalized method name ( C# ) must not read as a Prolog variable
 testPrologifyCallResolvedMethodOfClassQuoted :: IO ()
 testPrologifyCallResolvedMethodOfClassQuoted =
@@ -233,6 +249,8 @@ tests = do
     it' testPrologifyCallMethodOf1stPartyImportedName "prologify_CallMethodOf1stPartyImportedName should render kb_call_method_of_1st_party_imported_name( <call>, '<method>', '<name>', '<file>' )."
     it' testPrologifyFieldReadOf1stPartyImportedName "prologify_FieldReadOf1stPartyImportedName should render kb_field_read_of_1st_party_imported_name( <field read>, '<field>', '<name>', '<file>' )."
     it' testPrologifyReturnValueOfCall "prologify_ReturnValueOfCall should render kb_return_value_of_call( <return value>, <call> )."
+    it' testPrologifyCallMethodOfReturnValue "prologify_CallMethodOfReturnValue should render kb_call_method_of_return_value( <call>, '<method>', <return value> )."
+    it' testPrologifyFqnReturnTypeOf "prologifyFqn spells ReturnTypeOf as its callee"
     it' testPrologifyCallResolvedMethodOfClassQuoted "kb_call_method_of_class quotes the method name"
     it' testPrologifyCallResolvedEscapesQuote "kb_call_resolved escapes a quote in the fqn"
     it' testCompletelyInvalidLocationString "completelyInvalidLocationString should return Nothing"
