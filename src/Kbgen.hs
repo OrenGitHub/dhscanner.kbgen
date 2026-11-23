@@ -61,6 +61,7 @@ module Kbgen (
     Call1stPartyFuncDefinedInFile(..),
     CallMethodOf1stPartyImportedName(..),
     FieldReadOf1stPartyImportedName(..),
+    ReturnValueOfCall(..),
     ImportedName(..),
     ImportedFromFile(..),
     ParamName(..),
@@ -117,6 +118,7 @@ module Kbgen (
     CallResolved(..),
     FieldReadResolved(..),
     FieldRead(..),
+    ReturnValue(..),
     CalledFrom(..),
     AssignedValue(..),
     ResolvedSuper(..),
@@ -487,6 +489,45 @@ data FieldReadOf1stPartyImportedName = FieldReadOf1stPartyImportedName
     FieldName -- ^
     ImportedName -- ^
     ImportedFromFile -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_return_value_of_call( ReturnValue, Call ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- The value a call returns, linked to the call itself : @Call@ is @foo()@,
+-- whose callee @foo@ holds the signature, @ReturnValue@ is what @foo()@
+-- evaluates to. It separates a call from the type of its result, so a
+-- predicate can give @ReturnValue@ the return type of the method @Call@
+-- resolves to.
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- value_of_type( ReturnValue, Type ) :-
+--     kb_return_value_of_call( ReturnValue, Call ),
+--     kb_call_method_of_1st_party_imported_name( Call, Method, Name, File ),
+--     kb_class_def( Class, Name, File ),
+--     kb_class_has_3rd_party_super( Class, _, Super ),
+--     return_type_method_of_class( Type, Method, Super ).
+-- @
+--
+-- Other facts combined in this predicate:
+--
+--     * 'CallMethodOf1stPartyImportedName'
+--     * 'ClassDef'
+--
+data ReturnValueOfCall = ReturnValueOfCall
+    ReturnValue -- ^
+    Call -- ^
     deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
 data AssignValueToToplevelVarName = AssignValueToToplevelVarName
@@ -1456,6 +1497,7 @@ data Lhs = Lhs Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data Rhs = Rhs Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ComparisonOp = ComparisonOp String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ReturnedValue = ReturnedValue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data ReturnValue = ReturnValue Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ThenPart = ThenPart Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ElsePart = ElsePart Location deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
@@ -1525,6 +1567,7 @@ data Fact
    | Call1stPartyFuncDefinedInFileCtor Call1stPartyFuncDefinedInFile
    | CallMethodOf1stPartyImportedNameCtor CallMethodOf1stPartyImportedName
    | FieldReadOf1stPartyImportedNameCtor FieldReadOf1stPartyImportedName
+   | ReturnValueOfCallCtor ReturnValueOfCall
    | CallMethodOfUntypedNamedParamCtor CallMethodOfUntypedNamedParam
    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
@@ -1574,6 +1617,7 @@ prologify (Call1stPartyFuncDefinedInDirCtor content) = prologify_Call1stPartyFun
 prologify (Call1stPartyFuncDefinedInFileCtor content) = prologify_Call1stPartyFuncDefinedInFile content
 prologify (CallMethodOf1stPartyImportedNameCtor content) = prologify_CallMethodOf1stPartyImportedName content
 prologify (FieldReadOf1stPartyImportedNameCtor content) = prologify_FieldReadOf1stPartyImportedName content
+prologify (ReturnValueOfCallCtor content) = prologify_ReturnValueOfCall content
 prologify (CallMethodOfUntypedNamedParamCtor content) = prologify_CallMethodOfUntypedNamedParam content
 
 prologify_ParamResolvedType' :: Location -> String -> String
@@ -1764,6 +1808,10 @@ prologify_CallMethodOf1stPartyImportedName (CallMethodOf1stPartyImportedName (Ca
 prologify_FieldReadOf1stPartyImportedName :: FieldReadOf1stPartyImportedName -> String
 prologify_FieldReadOf1stPartyImportedName (FieldReadOf1stPartyImportedName (FieldRead r) (FieldName field) (ImportedName name) (ImportedFromFile f)) =
     printf "kb_field_read_of_1st_party_imported_name( %s, \'%s\', \'%s\', \'%s\' )." (locationify r) (quoted field) (quoted name) (quoted f)
+
+prologify_ReturnValueOfCall :: ReturnValueOfCall -> String
+prologify_ReturnValueOfCall (ReturnValueOfCall (ReturnValue v) (Call c)) =
+    printf "kb_return_value_of_call( %s, %s )." (locationify v) (locationify c)
 
 prologify_Call1stPartyFuncDefinedInDir :: Call1stPartyFuncDefinedInDir -> String
 prologify_Call1stPartyFuncDefinedInDir (Call1stPartyFuncDefinedInDir call func d) = prologify_Call1stPartyFuncDefinedInDir' call func d

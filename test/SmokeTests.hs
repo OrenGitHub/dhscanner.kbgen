@@ -5,6 +5,8 @@ import Kbgen
     , CallMethodOf1stPartyImportedName (..)
     , FieldReadOf1stPartyImportedName (..)
     , FieldName (..)
+    , ReturnValueOfCall (..)
+    , ReturnValue (..)
     , CallResolved (..)
     , ImportedFromFile (..)
     , ImportedName (..)
@@ -189,6 +191,14 @@ testPrologifyFieldReadOf1stPartyImportedName =
         expected = "kb_field_read_of_1st_party_imported_name( " ++ locationify readLoc ++ ", 'class', 'PathUtil', 'src/Util/PathUtil.php' )."
     in prologify (FieldReadOf1stPartyImportedNameCtor r) `shouldBe` expected
 
+testPrologifyReturnValueOfCall :: IO ()
+testPrologifyReturnValueOfCall =
+    let valueLoc = sampleLoc 1
+        callLoc = sampleLoc 2
+        r = ReturnValueOfCall (ReturnValue valueLoc) (Call callLoc)
+        expected = "kb_return_value_of_call( " ++ locationify valueLoc ++ ", " ++ locationify callLoc ++ " )."
+    in prologify (ReturnValueOfCallCtor r) `shouldBe` expected
+
 -- a capitalized method name ( C# ) must not read as a Prolog variable
 testPrologifyCallResolvedMethodOfClassQuoted :: IO ()
 testPrologifyCallResolvedMethodOfClassQuoted =
@@ -222,6 +232,7 @@ tests = do
     it' testPrologifyFqnShapes "prologifyFqn spells every fqn shape without Haskell show"
     it' testPrologifyCallMethodOf1stPartyImportedName "prologify_CallMethodOf1stPartyImportedName should render kb_call_method_of_1st_party_imported_name( <call>, '<method>', '<name>', '<file>' )."
     it' testPrologifyFieldReadOf1stPartyImportedName "prologify_FieldReadOf1stPartyImportedName should render kb_field_read_of_1st_party_imported_name( <field read>, '<field>', '<name>', '<file>' )."
+    it' testPrologifyReturnValueOfCall "prologify_ReturnValueOfCall should render kb_return_value_of_call( <return value>, <call> )."
     it' testPrologifyCallResolvedMethodOfClassQuoted "kb_call_method_of_class quotes the method name"
     it' testPrologifyCallResolvedEscapesQuote "kb_call_resolved escapes a quote in the fqn"
     it' testCompletelyInvalidLocationString "completelyInvalidLocationString should return Nothing"
