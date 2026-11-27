@@ -121,6 +121,8 @@ module Kbgen (
     FieldRead(..),
     ReturnValue(..),
     CalledFrom(..),
+    CalledFromScript(..),
+    ScriptFileName(..),
     AssignedValue(..),
     ResolvedSuper(..),
     FuncDefinedInDir(..),
@@ -1182,6 +1184,57 @@ data CalledFrom = CalledFrom
     Callable -- ^
     deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 
+-- |
+--
+-- __Name__
+--
+-- This is how the fact will look inside the Prolog file
+--
+-- @
+-- kb_called_from_script( Call, ScriptFileName ).
+-- @
+--
+-- __When should I use this fact__
+--
+-- A call at the top level of a script ( a file's code outside any
+-- callable ), with the script named by its file : the same repo relative
+-- path a constant string in the code spells, e.g. the template a Laravel
+-- @view@ renders ( the php fronts rewrite the view name to its file ).
+-- 'CalledFrom' gives the same call's script as a location, which a
+-- predicate cannot build from a file name.
+--
+-- Code snippet ( PHP, Laravel ):
+--
+-- @
+-- return view( 'posts.show', [ 'post' => $post ] );     \/\/ app\/Http\/Controllers\/PostController.php
+--
+-- \<?php echo e( $post->title ); ?\>                        \/\/ resources\/views\/posts\/show.blade.php
+-- @
+--
+-- __Writing a predicate with this fact and others__
+--
+-- @
+-- renders_script( Caller, Script ) :-
+--     kb_called_from( View, Caller ),
+--     kb_call_resolved( View, 'laravel.view' ),
+--     kb_arg_i_for_call( Arg0, 0, View ),
+--     kb_const_string( Arg0, File ),
+--     kb_called_from_script( TopLevelCall, File ),
+--     kb_called_from( TopLevelCall, Script ).
+-- @
+--
+-- Other facts combined in this predicate:
+--
+--     * 'CalledFrom'
+--     * 'CallResolved'
+--     * 'ArgiForCall'
+--     * 'ConstString'
+--
+data CalledFromScript = CalledFromScript
+    Call -- ^
+    ScriptFileName -- ^
+    deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+
 
 -- |
 --
@@ -1549,6 +1602,7 @@ data SuperQualifiedName = SuperQualifiedName Fqn.Fqn deriving ( Show, Eq, Ord, G
 
 data FuncDefinedInDir = FuncDefinedInDir FilePath deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data FuncDefinedInFile = FuncDefinedInFile FilePath deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
+data ScriptFileName = ScriptFileName FilePath deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ImportedName = ImportedName String deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ImportedFromFile = ImportedFromFile FilePath deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
 data ClassDefinedInFile = ClassDefinedInFile FilePath deriving ( Show, Eq, Ord, Generic, ToJSON, FromJSON )
@@ -1577,6 +1631,7 @@ data Fact
    | CallResolvedCtor CallResolved
    | FieldReadResolvedCtor FieldReadResolved
    | CalledFromCtor CalledFrom
+   | CalledFromScriptCtor CalledFromScript
    | ConstBoolTrueCtor ConstBoolTrue
    | ConstNullCtor ConstNull
    | GatedReturnCtor GatedReturn
@@ -1628,6 +1683,7 @@ prologify (DataflowEdgeCtor content) = prologify_DataflowEdge content
 prologify (CallResolvedCtor content) = prologify_CallResolved content
 prologify (FieldReadResolvedCtor content) = prologify_FieldReadResolved content
 prologify (CalledFromCtor content) = prologify_CalledFrom content
+prologify (CalledFromScriptCtor content) = prologify_CalledFromScript content
 prologify (ConstBoolTrueCtor content) = prologify_ConstBoolTrue content
 prologify (ConstNullCtor content) = prologify_ConstNull content
 prologify (GatedReturnCtor content) = prologify_GatedReturn content
@@ -1920,6 +1976,9 @@ prologify_CalledFrom' call callable = printf "kb_called_from( %s, %s )." (locati
 
 prologify_CalledFrom :: CalledFrom -> String
 prologify_CalledFrom (CalledFrom (Call call) (Callable callable)) = prologify_CalledFrom' call callable
+
+prologify_CalledFromScript :: CalledFromScript -> String
+prologify_CalledFromScript (CalledFromScript (Call call) (ScriptFileName f)) = printf "kb_called_from_script( %s, '%s' )." (locationify call) f
 
 normalizeChar :: Char -> String
 normalizeChar '/' = "_slash_"
